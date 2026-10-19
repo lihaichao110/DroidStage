@@ -10,14 +10,14 @@ vi.mock('electron', () => ({ app: { isPackaged: false, getAppPath: () => '' } })
 const { buildServerArgs, SCRCPY_VERSION, DEFAULT_SCRCPY_OPTIONS } = await import('../src/main/scrcpy-server')
 
 describe('buildServerArgs', () => {
-  it('包含视频-only 推流的全部关键参数', () => {
+  it('包含视频+控制双通道的全部关键参数', () => {
     const args = buildServerArgs(1, DEFAULT_SCRCPY_OPTIONS)
     for (const required of [
       'tunnel_forward=true',
       'video=true',
       'audio=false',
       'video_codec=h264',
-      'control=false',
+      'control=true',
       'raw_stream=true',
       'stay_awake=true',
       `max_size=${DEFAULT_SCRCPY_OPTIONS.maxSize}`,

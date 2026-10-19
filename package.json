@@ -1,8 +1,8 @@
 {
-  "name": "android-auto-desk",
+  "name": "droidstage",
   "version": "0.1.0",
   "private": true,
-  "description": "Android UI automation desktop client",
+  "description": "DroidStage Android UI automation desktop client",
   "main": "./out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
@@ -31,7 +31,7 @@
   },
   "build": {
     "appId": "dev.androidautodesk.app",
-    "productName": "AndroidAutoDesk",
+    "productName": "DroidStage",
     "directories": { "output": "release" },
     "files": ["out/**/*", "package.json"],
     "extraResources": [
@@ -39,8 +39,8 @@
       { "from": "assets/adb", "to": "adb" },
       { "from": "assets/mirroring", "to": "mirroring" }
     ],
-    "win": { "target": ["nsis"], "arch": ["x64"] },
-    "mac": { "target": ["dmg", "zip"], "category": "public.app-category.developer-tools" },
+    "win": { "target": ["nsis"], "arch": ["x64"], "icon": "src/renderer/src/assets/droidstage-icon.ico" },
+    "mac": { "target": ["dmg", "zip"], "category": "public.app-category.developer-tools", "icon": "src/renderer/src/assets/droidstage-icon.icns" },
     "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true }
   }
 }

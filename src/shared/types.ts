@@ -37,13 +37,16 @@ export type UiNode = {
 export type HierarchySnapshot = { nodes: UiNode[]; width: number; height: number; capturedAt: string }
 
 /**
- * 投屏触摸事件：操控模式下由鼠标手势映射生成，主进程转发给 agent 注入。
- * move 携带点序列：拖拽时鼠标高频移动在渲染端按帧合并，降低 adb 往返次数。
+ * 投屏触摸事件：操控模式下由鼠标手势映射生成，主进程校验后编码为 scrcpy 控制消息。
+ * 坐标为视频帧坐标（scrcpy 控制协议的坐标空间，server 端自行换算到物理屏）。
+ * move 携带点序列：拖拽时鼠标高频移动在渲染端按帧合并，控制通道逐点写入。
  */
 export type TouchInput =
-  | { action: 'down'; x: number; y: number }
-  | { action: 'move'; points: Point[] }
-  | { action: 'up' | 'cancel'; x: number; y: number }
+  | { action: 'down' | 'up' | 'cancel'; x: number; y: number; frameWidth: number; frameHeight: number }
+  | { action: 'move'; points: Point[]; frameWidth: number; frameHeight: number }
+
+/** 滚轮输入：dy 为滚轮格数（可带小数，来自触控板平滑滚动），正值为向下滚。 */
+export type ScrollInput = { x: number; y: number; frameWidth: number; frameHeight: number; dy: number }
 
 /** 投屏状态：starting 拉起中、streaming 推流中、stopped 已停止、error 启动或运行中断。 */
 export type MirrorStatus =
@@ -79,7 +82,7 @@ export type AppApi = {
   startMirroring(): Promise<void>
   stopMirroring(): Promise<void>
   sendTouch(event: TouchInput): Promise<void>
-  sendScroll(input: { x: number; y: number; dy: number }): Promise<void>
+  sendScroll(input: ScrollInput): Promise<void>
   sendKey(key: 'back' | 'home'): Promise<void>
   /** 订阅投屏流起始：meta 携带设备物理分辨率，其后视频字节经 onMirrorChunk 连续下发。 */
   onMirrorStream(listener: (meta: { physicalWidth: number; physicalHeight: number }) => void): () => void

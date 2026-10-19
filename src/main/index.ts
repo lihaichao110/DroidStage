@@ -1,3 +1,6 @@
+/**
+ * 桌面主进程入口：创建窗口并注册设备、任务与结果目录相关的 IPC。
+ */
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -6,8 +9,9 @@ import { DeviceSession } from './session'
 import { TaskRunner } from './runner'
 import { MirrorService } from './mirroring'
 import { validateSelector, validateTask } from '../shared/task'
-import { touchArgs } from '../shared/touch'
-import type { AutomationTask, Selector, RunEvent, TouchInput } from '../shared/types'
+import { controlScroll, controlTouchEvents } from '../shared/touch'
+import { AKEYCODE_HOME, encodeBackClick, encodeKeyClick, encodeScrollEvent, encodeTouchEvent } from '../shared/utils/scrcpy-control-msg'
+import type { AutomationTask, ScrollInput, Selector, RunEvent, TouchInput } from '../shared/types'
 
 let window: BrowserWindow | null = null
 let session: DeviceSession | null = null
@@ -20,7 +24,7 @@ function createWindow(): void {
     height: 900,
     minWidth: 1100,
     minHeight: 700,
-    title: 'AndroidAutoDesk',
+    title: 'DroidStage',
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),
       contextIsolation: true,
@@ -69,32 +73,30 @@ app.whenReady().then(() => {
     await mirror.start(window, requireSession().serial)
   })
   ipcMain.handle('mirror:stop', () => mirror.stop())
-  // 手动操控三类输入统一走触摸通道（与命令通道隔离），任务运行中禁止干预
+  // 手动操控三类输入统一编码为 scrcpy 控制消息直写控制通道（即发即弃），任务运行中禁止干预
   ipcMain.handle('mirror:touch', (_event, input: TouchInput) => {
     if (runner.isRunning()) throw new Error('任务运行中不能手动操控')
-    return requireSession().touchClientOrConnect().then((client) => client.request('touch', touchArgs(input), 5000))
+    for (const touch of controlTouchEvents(input)) mirror.sendControl(encodeTouchEvent(touch))
   })
-  ipcMain.handle('mirror:scroll', (_event, input: { x: number; y: number; dy: number }) => {
+  ipcMain.handle('mirror:scroll', (_event, input: ScrollInput) => {
     if (runner.isRunning()) throw new Error('任务运行中不能手动操控')
-    const isFiniteCoord = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value)
-    if (!isFiniteCoord(input?.x) || !isFiniteCoord(input?.y) || !isFiniteCoord(input?.dy) || Math.abs(input.dy) > 1000) throw new Error('滚轮参数无效')
-    const args = { x: Math.round(input.x), y: Math.round(input.y), dy: Math.round(input.dy) }
-    return requireSession().touchClientOrConnect().then((client) => client.request('scroll', args, 5000))
+    mirror.sendControl(encodeScrollEvent(controlScroll(input)))
   })
   ipcMain.handle('device:key', (_event, key: 'back' | 'home') => {
     if (key !== 'back' && key !== 'home') throw new Error('未知按键')
     if (runner.isRunning()) throw new Error('任务运行中不能手动操控')
-    return requireSession().touchClientOrConnect().then((client) => client.request('key', { key }, 5000))
+    // back 走 BACK_OR_SCREEN_ON：息屏时 server 自动转为电源键，右键即具备唤醒能力
+    for (const message of key === 'back' ? encodeBackClick() : encodeKeyClick(AKEYCODE_HOME)) mirror.sendControl(message)
   })
   ipcMain.handle('task:save', async (_event, task: AutomationTask) => {
     validateTask(task)
-    const result = await dialog.showSaveDialog(window!, { title: '保存任务', defaultPath: `${task.name}.json`, filters: [{ name: 'AndroidAutoDesk 任务', extensions: ['json'] }] })
+    const result = await dialog.showSaveDialog(window!, { title: '保存任务', defaultPath: `${task.name}.json`, filters: [{ name: 'DroidStage 任务', extensions: ['json'] }] })
     if (result.canceled || !result.filePath) return null
     await writeFile(result.filePath, JSON.stringify(task, null, 2), 'utf8')
     return result.filePath
   })
   ipcMain.handle('task:load', async () => {
-    const result = await dialog.showOpenDialog(window!, { title: '打开任务', properties: ['openFile'], filters: [{ name: 'AndroidAutoDesk 任务', extensions: ['json'] }] })
+    const result = await dialog.showOpenDialog(window!, { title: '打开任务', properties: ['openFile'], filters: [{ name: 'DroidStage 任务', extensions: ['json'] }] })
     if (result.canceled || !result.filePaths[0]) return null
     const text = await readFile(result.filePaths[0], 'utf8')
     if (text.length > 2_000_000) throw new Error('任务文件过大')

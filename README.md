@@ -1,4 +1,4 @@
-# AndroidAutoDesk
+# DroidStage
 
 通过 USB 和 ADB 在电脑上编辑、运行安卓 App 自动化流程。桌面端使用 Electron、React、TypeScript；手机端使用 Kotlin 与 AndroidX UI Automator 2.4.0。第一版支持一台 Android 10+ 手机、Windows 10/11 x64、macOS 13+ Intel/Apple Silicon。
 

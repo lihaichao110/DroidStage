@@ -1,8 +1,8 @@
 /**
- * 投屏坐标换算与触摸输入校验测试：旋转方向推断、等比缩放、参数合法性。
+ * 投屏坐标换算与操控输入校验测试：旋转方向推断、等比缩放、scrcpy 控制消息的参数合法性。
  */
 import { describe, expect, it } from 'vitest'
-import { currentDeviceSize, frameToPoint, touchArgs } from '../src/shared/touch'
+import { controlScroll, controlTouchEvents, currentDeviceSize, frameToPoint } from '../src/shared/touch'
 import type { TouchInput } from '../src/shared/types'
 
 describe('currentDeviceSize', () => {
@@ -38,30 +38,63 @@ describe('frameToPoint', () => {
   })
 })
 
-describe('touchArgs', () => {
-  it('down/up/cancel：坐标取整透传', () => {
-    expect(touchArgs({ action: 'down', x: 10.6, y: 20.1 })).toEqual({ action: 'down', x: 11, y: 20 })
-    expect(touchArgs({ action: 'up', x: 3, y: 4 })).toEqual({ action: 'up', x: 3, y: 4 })
-    expect(touchArgs({ action: 'cancel', x: 3, y: 4 })).toEqual({ action: 'cancel', x: 3, y: 4 })
+describe('controlTouchEvents', () => {
+  const frame = { frameWidth: 720, frameHeight: 1600 }
+
+  it('down/up：坐标取整，帧尺寸透传', () => {
+    expect(controlTouchEvents({ action: 'down', x: 10.6, y: 20.1, ...frame }))
+      .toEqual([{ action: 'down', x: 11, y: 20, ...frame }])
+    expect(controlTouchEvents({ action: 'up', x: 3, y: 4, ...frame }))
+      .toEqual([{ action: 'up', x: 3, y: 4, ...frame }])
   })
 
-  it('move：轨迹点整组透传', () => {
-    const args = touchArgs({ action: 'move', points: [{ x: 1.5, y: 2 }, { x: 3, y: 4.5 }] })
-    expect(args).toEqual({ action: 'move', points: [{ x: 2, y: 2 }, { x: 3, y: 5 }] })
+  it('cancel 归一化为 up（scrcpy 客户端不发 CANCEL，统一以抬手收尾）', () => {
+    expect(controlTouchEvents({ action: 'cancel', x: 3, y: 4, ...frame }))
+      .toEqual([{ action: 'up', x: 3, y: 4, ...frame }])
+  })
+
+  it('move：轨迹点逐点取整', () => {
+    const events = controlTouchEvents({ action: 'move', points: [{ x: 1.5, y: 2 }, { x: 3, y: 4.5 }], ...frame })
+    expect(events).toEqual([
+      { action: 'move', x: 2, y: 2, ...frame },
+      { action: 'move', x: 3, y: 5, ...frame }
+    ])
   })
 
   it('空轨迹或超量轨迹拒绝', () => {
-    expect(() => touchArgs({ action: 'move', points: [] })).toThrow('轨迹点数量无效')
+    expect(() => controlTouchEvents({ action: 'move', points: [], ...frame })).toThrow('轨迹点数量无效')
     const points = Array.from({ length: 65 }, () => ({ x: 1, y: 1 }))
-    expect(() => touchArgs({ action: 'move', points })).toThrow('轨迹点数量无效')
+    expect(() => controlTouchEvents({ action: 'move', points, ...frame })).toThrow('轨迹点数量无效')
   })
 
   it('坐标越界（>10000，与任务校验同上限）拒绝', () => {
-    expect(() => touchArgs({ action: 'down', x: 10001, y: 5 })).toThrow('触摸坐标无效')
-    expect(() => touchArgs({ action: 'down', x: Number.NaN, y: 5 })).toThrow('触摸坐标无效')
+    expect(() => controlTouchEvents({ action: 'down', x: 10001, y: 5, ...frame })).toThrow('触摸坐标无效')
+    expect(() => controlTouchEvents({ action: 'down', x: Number.NaN, y: 5, ...frame })).toThrow('触摸坐标无效')
+  })
+
+  it('帧尺寸非法（0、越界 u16、非整数）拒绝', () => {
+    expect(() => controlTouchEvents({ action: 'down', x: 1, y: 1, frameWidth: 0, frameHeight: 100 })).toThrow('投屏帧尺寸无效')
+    expect(() => controlTouchEvents({ action: 'down', x: 1, y: 1, frameWidth: 720, frameHeight: 65536 })).toThrow('投屏帧尺寸无效')
+    expect(() => controlTouchEvents({ action: 'down', x: 1, y: 1, frameWidth: 720.5, frameHeight: 1600 })).toThrow('投屏帧尺寸无效')
   })
 
   it('未知动作拒绝', () => {
-    expect(() => touchArgs({ action: 'jump', x: 1, y: 1 } as unknown as TouchInput)).toThrow('未知触摸动作')
+    expect(() => controlTouchEvents({ action: 'jump', x: 1, y: 1, ...frame } as unknown as TouchInput)).toThrow('未知触摸动作')
+  })
+})
+
+describe('controlScroll', () => {
+  const base = { x: 10.6, y: 20.1, frameWidth: 720, frameHeight: 1600 }
+
+  it('坐标取整，dy 钳制在单条消息的 ±16 格内', () => {
+    expect(controlScroll({ ...base, dy: -3 })).toEqual({ x: 11, y: 20, frameWidth: 720, frameHeight: 1600, notches: -3 })
+    expect(controlScroll({ ...base, dy: 99 }).notches).toBe(16)
+    expect(controlScroll({ ...base, dy: -99 }).notches).toBe(-16)
+  })
+
+  it('dy 非有限数或坐标越界拒绝', () => {
+    expect(() => controlScroll({ ...base, dy: Number.NaN })).toThrow('滚轮参数无效')
+    expect(() => controlScroll({ ...base, dy: 1, x: 10001 })).toThrow('触摸坐标无效')
+    expect(() => controlScroll({ ...base, dy: 1, frameWidth: 0 })).toThrow('投屏帧尺寸无效')
   })
 })

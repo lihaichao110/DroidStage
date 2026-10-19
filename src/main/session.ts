@@ -15,7 +15,6 @@ export class DeviceSession {
   readonly serial: string
   private process: ChildProcessWithoutNullStreams | null = null
   private client: AgentClient | null = null
-  private touchClient: AgentClient | null = null
   private hostPort: number | null = null
   private token: string | null = null
 
@@ -57,7 +56,7 @@ export class DeviceSession {
     if (!Number.isInteger(this.hostPort) || this.hostPort <= 0) throw new Error('ADB 端口映射失败')
     const token = randomBytes(24).toString('hex')
     this.token = token
-    this.process = adbSpawn(onDevice(this.serial, ['shell', 'am', 'instrument', '-w', '-r', '-e', 'token', token, RUNNER]))
+    this.process = await adbSpawn(onDevice(this.serial, ['shell', 'am', 'instrument', '-w', '-r', '-e', 'token', token, RUNNER]))
     let instrumentOutput = ''
     this.process.stdout.on('data', (data: Buffer) => { instrumentOutput = (instrumentOutput + data.toString('utf8')).slice(-5000) })
     this.process.stderr.on('data', (data: Buffer) => { instrumentOutput = (instrumentOutput + data.toString('utf8')).slice(-5000) })
@@ -87,26 +86,6 @@ export class DeviceSession {
   agent(): AgentClient {
     if (!this.client) throw new Error('手机辅助服务未连接')
     return this.client
-  }
-
-  /**
-   * 投屏操控专用的第二条 agent 连接：与命令通道隔离，
-   * 触摸事件不会被 wait/snapshot 等长操作阻塞。首次调用时懒建立。
-   * @throws 会话未就绪或 5s 内连接失败时抛出
-   */
-  async touchClientOrConnect(): Promise<AgentClient> {
-    if (this.touchClient) return this.touchClient
-    if (!this.hostPort || !this.token) throw new Error('手机辅助服务未连接')
-    const deadline = Date.now() + 5000
-    while (Date.now() < deadline) {
-      try {
-        this.touchClient = await AgentClient.connect(this.hostPort, this.token)
-        return this.touchClient
-      } catch {
-        await new Promise((resolve) => setTimeout(resolve, 250))
-      }
-    }
-    throw new Error('触摸通道连接超时')
   }
 
   async count(selector: Selector): Promise<number> { return this.agent().count(selector) }
@@ -143,8 +122,6 @@ export class DeviceSession {
     try { await this.client?.request('shutdown', {}, 1000) } catch { /* best effort */ }
     this.client?.close()
     this.client = null
-    this.touchClient?.close()
-    this.touchClient = null
     this.process?.kill()
     this.process = null
     if (this.hostPort) {

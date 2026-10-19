@@ -4,7 +4,7 @@
 
 ## 1. 项目概述
 
-AndroidAutoDesk 是一个 Android 自动化桌面工具：桌面端连接手机，下发自动化任务（输入、点击、断言、截图等），由手机端的 instrument 代理执行。
+DroidStage 是一个 Android 自动化桌面工具：桌面端连接手机，下发自动化任务（输入、点击、断言、截图等），由手机端的 instrument 代理执行。
 
 **技术栈**
 

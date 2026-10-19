@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import type { AutomationTask, Device, HierarchySnapshot, Point, RunEvent, Selector, Step, UiNode } from '../../shared/types'
 import { crossAppWarning, suggestedSelector, validateTask } from '../../shared/task'
 import { InspectorPanel } from './components/inspector-panel'
+import droidstageIcon from './assets/droidstage-icon.png'
 
 type EditorAction = Step['type']
 const defaultTask: AutomationTask = { version: 1, name: '新任务', packageName: '', steps: [] }
@@ -196,7 +197,7 @@ export default function App() {
 
   return <div className="app">
     <header className="topbar">
-      <div><h1>AndroidAutoDesk</h1><p>安卓可视化自动化 · USB / UI Automator</p></div>
+      <div className="brand"><img src={droidstageIcon} alt="" /><div><h1>DroidStage</h1><p>安卓可视化自动化 · USB / UI Automator</p></div></div>
       <div className="device-controls">
         <select aria-label="设备" value={serial} onChange={(event) => setSerial(event.target.value)} disabled={busy || connected}>
           {devices.length === 0 && <option value="">无设备</option>}

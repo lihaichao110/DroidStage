@@ -1,27 +1,16 @@
-import { app } from 'electron'
+/**
+ * ADB 进程封装：先确保二进制可用（开发模式含自动下载，见 adb-provision.ts），再执行命令并收集输出。
+ */
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
-import { existsSync } from 'node:fs'
-import path from 'node:path'
 import type { Device } from '../shared/types'
+import { ensureAdb } from './adb-provision'
 
-export function adbPath(): string {
-  if (!app.isPackaged && process.env.ADB_PATH) {
-    if (!existsSync(process.env.ADB_PATH)) throw new Error(`开发用 ADB 路径无效：${process.env.ADB_PATH}`)
-    return process.env.ADB_PATH
-  }
-  const target = process.platform === 'win32' ? 'win32/adb.exe' : process.arch === 'arm64' ? 'darwin-arm64/adb' : 'darwin-x64/adb'
-  const root = app.isPackaged ? path.join(process.resourcesPath, 'adb') : path.join(app.getAppPath(), 'assets', 'adb')
-  const binary = path.join(root, target)
-  if (!existsSync(binary)) throw new Error(`安装包缺少 ADB 组件：${target}。此构建不能连接手机。`)
-  return binary
-}
-
-export function adbSpawn(args: string[]): ChildProcessWithoutNullStreams {
-  return spawn(adbPath(), args, { windowsHide: true, stdio: 'pipe' })
+export async function adbSpawn(args: string[]): Promise<ChildProcessWithoutNullStreams> {
+  return spawn(await ensureAdb(), args, { windowsHide: true, stdio: 'pipe' })
 }
 
 export async function adb(args: string[], timeoutMs = 15000, maxBytes = 25_000_000): Promise<Buffer> {
-  const child = adbSpawn(args)
+  const child = await adbSpawn(args)
   const chunks: Buffer[] = []
   const errors: Buffer[] = []
   let bytes = 0

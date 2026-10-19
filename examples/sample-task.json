@@ -3,9 +3,9 @@
   "name": "辅助测试页中文输入",
   "packageName": "dev.androidautodesk.host",
   "steps": [
-    { "id": "input", "type": "input", "selector": { "kind": "resourceId", "value": "dev.androidautodesk.host:id/test_input" }, "text": "你好，AndroidAutoDesk", "timeoutMs": 10000 },
+    { "id": "input", "type": "input", "selector": { "kind": "resourceId", "value": "dev.androidautodesk.host:id/test_input" }, "text": "你好，DroidStage", "timeoutMs": 10000 },
     { "id": "tap", "type": "tap", "selector": { "kind": "resourceId", "value": "dev.androidautodesk.host:id/test_button" }, "timeoutMs": 10000 },
-    { "id": "assert", "type": "assert", "selector": { "kind": "text", "value": "你好，AndroidAutoDesk" }, "exists": true },
+    { "id": "assert", "type": "assert", "selector": { "kind": "text", "value": "你好，DroidStage" }, "exists": true },
     { "id": "screenshot", "type": "screenshot" }
   ]
 }

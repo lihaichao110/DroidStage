@@ -1,6 +1,6 @@
 /**
- * scrcpy-server 设备端投屏服务的启动与视频流接入：
- * push 二进制、建立端口转发、以 app_process 拉起 server 并读回纯 H.264 字节流。
+ * scrcpy-server 设备端投屏服务的启动与通道接入：push 二进制、建立端口转发、
+ * 以 app_process 拉起 server，读回纯 H.264 视频流并维护控制通道（下发操控消息）。
  */
 import { randomInt } from 'node:crypto'
 import { existsSync } from 'node:fs'
@@ -23,6 +23,12 @@ export type ScrcpyOptions = { maxSize: number; bitRate: number; maxFps: number }
 export const DEFAULT_SCRCPY_OPTIONS: ScrcpyOptions = { maxSize: 1024, bitRate: 6_000_000, maxFps: 60 }
 
 /**
+ * video socket 拨号后的宽限期：超过该时长连接仍存活即认定已被 server accept。
+ * adb 对未监听的 forward 目标会在几毫秒内断开本地连接，宽限期只需覆盖该秒断。
+ */
+const ACCEPT_GRACE_MS = 150
+
+/**
  * 组装 server 启动参数（key=value，跟在版本号之后）。纯函数，供测试校验参数完整性。
  * @param scid 31 位随机整数，避免同设备多实例 socket 冲突
  */
@@ -35,7 +41,8 @@ export function buildServerArgs(scid: number, options: ScrcpyOptions): string[] 
     'audio=false',
     // 切分器与解码管线只认 H.264：显式固定编码，若 server 默认值漂移必须在启动时失败
     'video_codec=h264',
-    'control=false', // 触摸注入走自研 agent 通道，不使用 scrcpy 控制协议
+    // 控制通道（video→control 双 socket）：鼠标操控经 scrcpy 协议注入；自动化任务仍走 agent
+    'control=true',
     'raw_stream=true', // 关闭 dummy byte/设备名/帧头等全部协议元数据，socket 即纯 H.264 流
     `max_size=${options.maxSize}`,
     `video_bit_rate=${options.bitRate}`,
@@ -66,8 +73,14 @@ export class ScrcpyServer {
   private process: ChildProcessWithoutNullStreams | null = null
   private socket: net.Socket | null = null
   private probeSocket: net.Socket | null = null
+  private controlSocket: net.Socket | null = null
   private hostPort: number | null = null
   private serverOutput = ''
+  private streaming = false
+  private closedBeforeData = false
+  // 首块数据等待的解除回调：数据监听先挂、等待后注册，两个时机都要能解除等待
+  private firstDataResolve: (() => void) | null = null
+  private firstDataReject: ((error: Error) => void) | null = null
   private stopping = false
   private readonly scid = randomInt(0, 0x8000_0000)
 
@@ -79,7 +92,7 @@ export class ScrcpyServer {
   }
 
   /**
-   * 推送 server、建立转发并拉起进程，直到 video socket 返回首块数据。
+   * 推送 server、建立转发并拉起进程，直到双通道建立且 video 通道返回首块数据。
    * @throws 组件缺失、端口映射失败、server 启动失败或 10s 内未推流时抛出
    */
   async start(): Promise<void> {
@@ -89,7 +102,7 @@ export class ScrcpyServer {
     if (!Number.isInteger(this.hostPort) || this.hostPort <= 0) throw new Error('投屏端口映射失败')
     // CLASSPATH 环境变量赋值需要 shell 解析，命令必须作为单个字符串传给 adb shell
     const args = [SCRCPY_VERSION, ...buildServerArgs(this.scid, this.options)].join(' ')
-    this.process = adbSpawn(onDevice(this.serial, ['shell', `CLASSPATH=${DEVICE_JAR} app_process / ${SERVER_CLASS} ${args}`]))
+    this.process = await adbSpawn(onDevice(this.serial, ['shell', `CLASSPATH=${DEVICE_JAR} app_process / ${SERVER_CLASS} ${args}`]))
     this.process.stdout.on('data', (data: Buffer) => { this.serverOutput = (this.serverOutput + data.toString('utf8')).slice(-5000) })
     this.process.stderr.on('data', (data: Buffer) => { this.serverOutput = (this.serverOutput + data.toString('utf8')).slice(-5000) })
     this.process.once('close', () => {
@@ -100,7 +113,7 @@ export class ScrcpyServer {
       this.cleanupSocket()
       this.onExit(`投屏进程异常：${error.message}`)
     })
-    await this.connectVideo()
+    await this.connectChannels()
   }
 
   private describeFailure(): string {
@@ -114,13 +127,13 @@ export class ScrcpyServer {
   }
 
   /**
-   * 连接 video socket 直到收到首块数据。关键约束：server 的视频通道只 accept 一次，
-   * 一旦某条连接被服务端 accept，桌面端绝不能主动放弃它（否则该连接作废，
-   * 之后的重试全部堵在监听 backlog 里永远收不到数据）。因此仅在「adb 秒断（目标尚未
-   * 监听）」时重试，连接建立后一直等到总超时或首块数据。
-   * @throws server 进程退出、或 10s 内未开始推流时抛出
+   * 连接 video 与 control 两条通道直到收到首块视频数据。server 按 video → control
+   * 的顺序 accept 且全部 accept 完才开始推流，因此必须先按序连完两条 socket 再等数据。
+   * 关键约束：server 每条通道只 accept 一次，连接一旦被 accept 就绝不能主动放弃，
+   * 重试仅允许发生在「adb 秒断（目标尚未监听）」这一种情形。
+   * @throws server 进程退出、控制通道连接失败或 10s 内未开始推流时抛出
    */
-  private async connectVideo(): Promise<void> {
+  private async connectChannels(): Promise<void> {
     const deadline = Date.now() + 10000
     while (Date.now() < deadline) {
       if (this.process?.exitCode !== null && this.process?.exitCode !== undefined) throw new Error(this.describeFailure())
@@ -138,47 +151,116 @@ export class ScrcpyServer {
         await new Promise((resolve) => setTimeout(resolve, 250))
         continue
       }
+      if (settled === 'failed') {
+        // video 已被 accept 后 control 连接失败：盲目重试会让新连接被 server 错记为
+        // video 通道而永远收不到数据，直接终止本次启动（MirrorService 会整体回收 server）
+        this.cleanupSocket()
+        throw new Error('投屏控制通道连接失败，请重新投屏')
+      }
       return
     }
     throw new Error(`投屏服务连接超时：${this.serverOutput.trim() || 'server 未开始推流'}`)
   }
 
   /**
-   * 尝试连接 video socket。
-   * @returns 'refused' 表示目标尚未监听（可安全重试）；'connected' 表示首块数据已到达，
-   * 常驻 data 监听已挂载。连接异常悬挂（既不断开也无数据）时不在此处判定，
-   * 由 connectVideo 的总超时兜底。
+   * 三阶段建连：video 拨号并过宽限期 → 挂常驻监听后拨 control → 等 video 首块数据。
+   * @returns 'refused' 表示转发目标尚未监听（可安全重试）；'connected' 表示已开始推流；
+   * 'failed' 表示 video 已被 accept 但 control 连接失败（不可重试）
    */
-  private tryConnect(): Promise<'refused' | 'connected'> {
+  private async tryConnect(): Promise<'refused' | 'connected' | 'failed'> {
+    const video = await this.dialVideo()
+    if (!video) return 'refused'
+    // video 已被 server accept，此后绝不能主动放弃，立即转入常驻生命周期
+    this.adoptVideoSocket(video)
+    const controlOk = await this.dialControl()
+    if (!controlOk) return 'failed'
+    return await this.awaitFirstData()
+  }
+
+  /**
+   * 拨 video socket 并等待宽限期：宽限期内被 adb 秒断说明转发目标尚未监听（返回 null，
+   * 可安全重试）；存活超过宽限期即认定已被 server accept。raw_stream 关闭了 dummy
+   * byte，accept 与否只能靠「连接是否被保留」判断。
+   */
+  private dialVideo(): Promise<net.Socket | null> {
     return new Promise((resolve) => {
       const socket = net.connect({ host: '127.0.0.1', port: this.hostPort! })
-      // 记录试探连接，总超时竞速获胜时由 connectVideo 销毁，避免悬置的 ESTABLISHED 泄漏
+      // 记录试探连接，失败/超时时销毁，避免悬置的 ESTABLISHED 泄漏
       this.probeSocket = socket
-      const giveUp = (): void => {
+      const settled = (result: net.Socket | null): void => {
+        clearTimeout(graceTimer)
         socket.removeAllListeners()
-        socket.destroy()
         if (this.probeSocket === socket) this.probeSocket = null
-        resolve('refused')
+        if (!result) socket.destroy()
+        resolve(result)
       }
-      const onFirstData = (first: Buffer): void => {
-        // 先摘掉试探期的 close/error 监听，避免常驻生命周期回调被 giveUp 语义误触发
-        socket.removeListener('close', giveUp)
-        socket.removeListener('error', giveUp)
-        if (this.probeSocket === socket) this.probeSocket = null
-        this.socket = socket
-        this.onData(first)
-        socket.on('data', (chunk: Buffer) => this.onData(chunk))
-        socket.once('close', () => {
-          this.cleanupSocket()
-          this.onExit(this.stopping ? null : '投屏连接已断开，请重试')
-        })
-        socket.once('error', () => { /* close 会跟着触发 */ })
-        resolve('connected')
-      }
-      socket.once('data', onFirstData)
-      socket.once('close', giveUp)
-      socket.once('error', giveUp)
+      const graceTimer = setTimeout(() => settled(socket), ACCEPT_GRACE_MS)
+      socket.once('close', () => settled(null))
+      socket.once('error', () => settled(null))
     })
+  }
+
+  /** 把已 accept 的 video socket 转入常驻生命周期：转发数据，断开即上报。 */
+  private adoptVideoSocket(socket: net.Socket): void {
+    this.socket = socket
+    socket.on('data', (chunk: Buffer) => {
+      if (!this.streaming) {
+        this.streaming = true
+        // 等待尚未注册时数据已到：先解除等待（awaitFirstData 会检查 streaming 兜底）
+        this.firstDataResolve?.()
+      }
+      this.onData(chunk)
+    })
+    socket.once('error', () => { /* close 会跟着触发 */ })
+    socket.once('close', () => {
+      this.cleanupSocket()
+      if (this.streaming) this.onExit(this.stopping ? null : '投屏连接已断开，请重试')
+      else {
+        // 推流前的断开：解除等待或记录状态，让 awaitFirstData 立即失败而非干等总超时
+        this.closedBeforeData = true
+        this.firstDataReject?.(new Error('投屏连接已断开，请重试'))
+      }
+    })
+  }
+
+  /**
+   * 拨 control socket，仅在 video 已被 accept 后调用（到达顺序即 server 的 accept 顺序）。
+   * 本地 'connect' 只代表 adb 接受了连接；目标不可达时 adb 会随即断开，
+   * 由常驻 close 监听清理引用，后续 sendControl 会显式报错。
+   */
+  private dialControl(): Promise<boolean> {
+    return new Promise((resolve) => {
+      const socket = net.connect({ host: '127.0.0.1', port: this.hostPort! })
+      socket.once('connect', () => {
+        this.controlSocket = socket
+        socket.once('error', () => socket.destroy())
+        socket.once('close', () => { if (this.controlSocket === socket) this.controlSocket = null })
+        resolve(true)
+      })
+      socket.once('error', () => { socket.destroy(); resolve(false) })
+    })
+  }
+
+  /**
+   * 等 video 首块数据（server 在 control 通道 accept 后才开始编码推流）。
+   * 推流前断开时立即失败，不干等总超时。
+   */
+  private awaitFirstData(): Promise<'connected'> {
+    if (this.streaming) return Promise.resolve('connected')
+    if (this.closedBeforeData) return Promise.reject(new Error('投屏连接已断开，请重试'))
+    return new Promise<'connected'>((resolve, reject) => {
+      this.firstDataResolve = () => resolve('connected')
+      this.firstDataReject = reject
+    })
+  }
+
+  /**
+   * 向控制通道写入一条控制消息（即发即弃，协议无响应）。
+   * @throws 控制通道未就绪（投屏未启动、正在建立或已断开）时抛出
+   */
+  sendControl(message: Buffer): void {
+    if (!this.controlSocket || this.controlSocket.destroyed) throw new Error('投屏控制通道未就绪')
+    this.controlSocket.write(message)
   }
 
   private cleanupSocket(): void {
@@ -186,6 +268,8 @@ export class ScrcpyServer {
     this.probeSocket = null
     this.socket?.destroy()
     this.socket = null
+    this.controlSocket?.destroy()
+    this.controlSocket = null
   }
 
   /** 停止投屏并清理子进程与端口转发；设备已拔出时忽略清理错误。 */

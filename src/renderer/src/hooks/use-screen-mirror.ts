@@ -1,6 +1,7 @@
 /**
  * 投屏 Hook：订阅主进程经 IPC 下发的视频字节流，经解码管线绘制到 canvas；
- * 操控模式下把鼠标手势（按下/拖拽/滚轮/右键返回）换算为设备坐标后下发注入。
+ * 操控模式下把鼠标手势（按下/拖拽/滚轮/右键返回/中键 HOME）换算为视频帧坐标，
+ * 由主进程编码为 scrcpy 控制消息注入；拾取模式换算设备坐标用于控件命中。
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { MirrorStatus } from '../../../shared/types'
@@ -94,54 +95,84 @@ export function useScreenMirror(isConnected: boolean, interactive: boolean) {
     }
   }, [])
 
-  /** 按显示帧率把积压的轨迹点合并成一次 move 请求，抵消 adb 每请求往返延迟。 */
+  /**
+   * 客户端坐标 → 视频帧坐标及帧尺寸（scrcpy 控制消息的坐标空间，
+   * server 端自行换算到物理屏，旋转无需本地处理）；画面未就绪时返回 null。
+   */
+  const clientToFrame = useCallback((clientX: number, clientY: number): { x: number; y: number; frameWidth: number; frameHeight: number } | null => {
+    const canvas = canvasRef.current
+    const frame = frameSizeRef.current
+    if (!canvas || !frame) return null
+    try {
+      const rect = canvas.getBoundingClientRect()
+      return { ...mapClientToScreen(clientX, clientY, rect, frame.width, frame.height), frameWidth: frame.width, frameHeight: frame.height }
+    } catch {
+      return null
+    }
+  }, [])
+
+  /** 按显示帧率把积压的轨迹点合并成一次 move 请求，限频即可，控制通道本身无往返开销。 */
   const flushMoves = (): void => {
     rafRef.current = 0
     const points = movesRef.current
-    if (!points.length || !draggingRef.current) return
+    const frame = frameSizeRef.current
+    if (!points.length || !draggingRef.current || !frame) return
     movesRef.current = []
-    void api.sendTouch({ action: 'move', points }).catch(touchError)
+    void api.sendTouch({ action: 'move', points, frameWidth: frame.width, frameHeight: frame.height }).catch(touchError)
   }
 
   const onPointerDown = useCallback((event: React.PointerEvent<HTMLCanvasElement>): void => {
-    if (!interactiveRef.current || event.button !== 0) return
-    const point = clientToDevice(event.clientX, event.clientY)
-    if (!point) return
+    if (!interactiveRef.current) return
+    // 中键映射 HOME（跟随 scrcpy 默认）；preventDefault 抑制浏览器的中键自动滚动
+    if (event.button === 1) {
+      event.preventDefault()
+      void api.sendKey('home').catch(touchError)
+      return
+    }
+    if (event.button !== 0) return
+    const input = clientToFrame(event.clientX, event.clientY)
+    if (!input) return
     event.currentTarget.setPointerCapture(event.pointerId)
     draggingRef.current = true
     movesRef.current = []
-    void api.sendTouch({ action: 'down', x: point.x, y: point.y }).catch(touchError)
-  }, [clientToDevice])
+    void api.sendTouch({ action: 'down', ...input }).catch(touchError)
+  }, [clientToFrame])
 
   const onPointerMove = useCallback((event: React.PointerEvent<HTMLCanvasElement>): void => {
     if (!draggingRef.current) return
-    const point = clientToDevice(event.clientX, event.clientY)
-    if (!point) return
-    movesRef.current.push(point)
+    const input = clientToFrame(event.clientX, event.clientY)
+    if (!input) return
+    movesRef.current.push({ x: input.x, y: input.y })
     if (!rafRef.current) rafRef.current = requestAnimationFrame(flushMoves)
-  }, [clientToDevice])
+  }, [clientToFrame])
 
   const onPointerUp = useCallback((event: React.PointerEvent<HTMLCanvasElement>): void => {
     if (!draggingRef.current) return
     draggingRef.current = false
     if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = 0 }
     const points = movesRef.current
+    const frame = frameSizeRef.current
     movesRef.current = []
     // 先补发未合并的轨迹再抬手，保证拖拽轨迹完整
-    if (points.length) void api.sendTouch({ action: 'move', points }).catch(touchError)
-    const point = clientToDevice(event.clientX, event.clientY) ?? points[points.length - 1]
-    if (point) void api.sendTouch({ action: 'up', x: point.x, y: point.y }).catch(touchError)
-  }, [clientToDevice])
+    if (points.length && frame) {
+      void api.sendTouch({ action: 'move', points, frameWidth: frame.width, frameHeight: frame.height }).catch(touchError)
+    }
+    const input = clientToFrame(event.clientX, event.clientY)
+      ?? (points.length && frame ? { x: points[points.length - 1].x, y: points[points.length - 1].y, frameWidth: frame.width, frameHeight: frame.height } : null)
+    if (input) void api.sendTouch({ action: 'up', ...input }).catch(touchError)
+  }, [clientToFrame])
 
   const onPointerCancel = useCallback((event: React.PointerEvent<HTMLCanvasElement>): void => {
     if (!draggingRef.current) return
     draggingRef.current = false
     if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = 0 }
     const points = movesRef.current
+    const frame = frameSizeRef.current
     movesRef.current = []
-    const point = clientToDevice(event.clientX, event.clientY) ?? points[points.length - 1]
-    if (point) void api.sendTouch({ action: 'cancel', x: point.x, y: point.y }).catch(touchError)
-  }, [clientToDevice])
+    const input = clientToFrame(event.clientX, event.clientY)
+      ?? (points.length && frame ? { x: points[points.length - 1].x, y: points[points.length - 1].y, frameWidth: frame.width, frameHeight: frame.height } : null)
+    if (input) void api.sendTouch({ action: 'cancel', ...input }).catch(touchError)
+  }, [clientToFrame])
 
   // 滚轮与右键需要 preventDefault，React 合成事件挂在根节点且 wheel 为 passive，必须用原生监听
   useEffect(() => {
@@ -150,8 +181,11 @@ export function useScreenMirror(isConnected: boolean, interactive: boolean) {
     const onWheel = (event: WheelEvent): void => {
       if (!interactiveRef.current) return
       event.preventDefault()
-      const point = clientToDevice(event.clientX, event.clientY)
-      if (point) void api.sendScroll({ x: point.x, y: point.y, dy: Math.max(-1000, Math.min(1000, event.deltaY)) }).catch(touchError)
+      const input = clientToFrame(event.clientX, event.clientY)
+      if (!input) return
+      // deltaMode 归一化为滚轮格数：像素模式（Chrome/Edge 默认）每格 100px，行模式（Firefox 可选）一行即一格
+      const dy = event.deltaMode === WheelEvent.DOM_DELTA_LINE ? event.deltaY : event.deltaY / 100
+      void api.sendScroll({ ...input, dy }).catch(touchError)
     }
     const onContextMenu = (event: MouseEvent): void => {
       if (!interactiveRef.current) return
@@ -164,7 +198,7 @@ export function useScreenMirror(isConnected: boolean, interactive: boolean) {
       canvas.removeEventListener('wheel', onWheel)
       canvas.removeEventListener('contextmenu', onContextMenu)
     }
-  }, [clientToDevice])
+  }, [clientToFrame])
 
   /** 出错后手动重试：主进程 start 会先停旧实例再交付新端口。 */
   const restart = useCallback(() => {

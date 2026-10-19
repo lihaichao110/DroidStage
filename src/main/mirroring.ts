@@ -28,6 +28,16 @@ export class MirrorService {
     return this.enqueue(() => this.doStop(true))
   }
 
+  /**
+   * 向当前投屏实例的控制通道写入一条控制消息（与 start/stop 不同，不排队：注入事件
+   * 必须按到达顺序尽快下发，且实现本身是同步写 socket，无并发交错风险）。
+   * @throws 投屏未启动时抛出
+   */
+  sendControl(message: Buffer): void {
+    if (!this.server) throw new Error('投屏未启动')
+    this.server.sendControl(message)
+  }
+
   private enqueue(job: () => Promise<void>): Promise<void> {
     const run = this.queue.then(job)
     // 队列只保证顺序，前一次失败不阻断后续操作

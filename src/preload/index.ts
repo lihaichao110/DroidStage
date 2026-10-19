@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { AppApi, AutomationTask, MirrorStatus, RunEvent, Selector, TouchInput } from '../shared/types'
+import type { AppApi, AutomationTask, MirrorStatus, RunEvent, ScrollInput, Selector, TouchInput } from '../shared/types'
 
 const api: AppApi = {
   listDevices: () => ipcRenderer.invoke('devices:list'),
@@ -21,7 +21,7 @@ const api: AppApi = {
   startMirroring: () => ipcRenderer.invoke('mirror:start'),
   stopMirroring: () => ipcRenderer.invoke('mirror:stop'),
   sendTouch: (event: TouchInput) => ipcRenderer.invoke('mirror:touch', event),
-  sendScroll: (input: { x: number; y: number; dy: number }) => ipcRenderer.invoke('mirror:scroll', input),
+  sendScroll: (input: ScrollInput) => ipcRenderer.invoke('mirror:scroll', input),
   sendKey: (key: 'back' | 'home') => ipcRenderer.invoke('device:key', key),
   // 视频流走常规 IPC：实测 sandbox 渲染进程收得到 MessagePort 对象但收不到端口消息
   onMirrorStream: (listener: (meta: { physicalWidth: number; physicalHeight: number }) => void) => {
