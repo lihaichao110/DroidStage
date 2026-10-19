@@ -1,0 +1,83 @@
+:root{font-family:Inter,"Microsoft YaHei",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#1b2430;background:#f3f5f9;font-synthesis:none}*{box-sizing:border-box}body{margin:0}button,input,select,textarea{font:inherit}button{border:1px solid #cbd3df;background:#fff;color:#243247;border-radius:7px;padding:7px 11px;cursor:pointer}button:hover:not(:disabled){border-color:#5578c8;background:#f7f9ff}button:disabled{cursor:not-allowed;opacity:.5}.primary{background:#305ec8;color:#fff;border-color:#305ec8}.primary:hover:not(:disabled){background:#244fb5;color:#fff}.app{height:100vh;display:flex;flex-direction:column}.topbar{display:flex;align-items:center;justify-content:space-between;padding:15px 22px;background:#fff;border-bottom:1px solid #dce1e9;gap:20px}.topbar h1{font-size:20px;margin:0 0 3px}.topbar p{font-size:12px;color:#66758b;margin:0}.device-controls{display:flex;align-items:center;gap:8px}.device-controls select{min-width:230px}.status{padding:9px 22px;font-size:13px;background:#e9f0ff;color:#27457d;border-bottom:1px solid #d4e0fa}.status a{margin-left:8px}.workspace{display:grid;grid-template-columns:minmax(360px,42%) minmax(480px,58%);gap:14px;padding:14px;min-height:0;flex:1}.panel{background:#fff;border:1px solid #dce1e9;border-radius:11px;display:flex;flex-direction:column;min-height:0;overflow:hidden}.panel-head{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;border-bottom:1px solid #e9edf2;gap:8px}.panel-head h2{font-size:16px;margin:0}.panel-head>div{display:flex;gap:6px}.inspector .image-stage{min-height:250px;flex:1;display:flex;align-items:center;justify-content:center;overflow:auto;background:#202a39;padding:12px;position:relative}.image-stage img{max-height:100%;max-width:100%;object-fit:contain;cursor:crosshair;box-shadow:0 8px 24px #0007}.stage-box{position:absolute;pointer-events:none;border-radius:3px;min-width:6px;min-height:6px}.stage-box.selected{border:2px solid #6f9dff;background:#4f83ff30}.stage-box.preview{border:2px dashed #ffb02e;background:#ffb02e1c}.empty{color:#aab8ce}.selection{display:flex;flex-direction:column;gap:3px;padding:10px 14px;border-top:1px solid #e9edf2;font-size:12px;min-height:92px;max-height:224px;overflow:auto}.selection small{color:#66758b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.selection label{display:flex;align-items:center;gap:8px}.attrs{width:100%;border-collapse:collapse}.attrs th{color:#66758b;text-align:left;font-weight:500;white-space:nowrap;padding:2px 10px 2px 0;vertical-align:top;width:64px}.attrs td{word-break:break-all;color:#243247}.match-ok{color:#1c7c43}.match-warn{color:#c23a3a}.match-loading{color:#66758b}.tree-head{display:flex;align-items:center;justify-content:space-between;padding:8px 14px;border-top:1px solid #e9edf2}.tree-head h3,.editor h3{font-size:13px;margin:0}.tree-head input{width:180px}.tree-area{display:flex;flex-direction:column;flex:1;min-height:150px}.tree-match{margin:0;padding:4px 14px;font-size:12px;color:#66758b;border-top:1px solid #e9edf2}.tree-empty{padding:10px 14px}.tree{flex:1;min-height:0;overflow:auto;border-top:1px solid #e9edf2}.tree-row{display:flex;align-items:center;gap:6px;padding:5px 10px 5px 0;font-size:12px;cursor:pointer;white-space:nowrap;border-bottom:1px solid #f0f2f5;content-visibility:auto;contain-intrinsic-size:auto 30px}.tree-row:hover{background:#f2f6ff}.tree-row.hovered{background:#eef3fe}.tree-row.selected{background:#dce9ff}.tree-toggle{flex:none;width:20px;height:20px;padding:0;border:0;background:none;color:#5c6b81;font-size:10px;line-height:1}.tree-toggle.leaf{visibility:hidden}.tree-label{flex:0 0 35%;overflow:hidden;text-overflow:ellipsis}.tree-row small{color:#718096;overflow:hidden;text-overflow:ellipsis}.editor{padding-bottom:12px}.editor>.fields,.editor>.field,.editor>h3,.editor>.add,.editor>.steps,.editor>.runbar,.editor>.log{margin-left:16px;margin-right:16px}.editor>h3{margin-top:12px;margin-bottom:9px}.fields{display:grid;gap:10px}.fields.two{grid-template-columns:1fr 1fr;margin-top:13px}.fields label,.field{display:flex;flex-direction:column;gap:5px;font-size:12px;color:#536176}.fields input,.fields select,.field textarea,.field select,.tree-head input,.device-controls select,.selection select{border:1px solid #cbd3df;border-radius:6px;padding:7px 8px;background:#fff;color:#1b2430;min-width:0}.field{margin-top:10px}.divider{height:1px;background:#e9edf2;margin:14px 0 0}.swipe-fields{grid-template-columns:repeat(5,1fr);margin:10px 16px}.add{align-self:flex-start;margin-top:12px}.steps{min-height:100px;max-height:260px;overflow:auto}.step{display:flex;align-items:center;gap:10px;border:1px solid #e2e7ee;border-radius:7px;margin-bottom:6px;padding:7px;font-size:12px}.step-index{display:grid;place-items:center;background:#eaf0fd;border-radius:5px;min-width:25px;height:25px;color:#305ec8;font-weight:700}.step-label{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.step-actions{display:flex;gap:4px}.step-actions button{padding:3px 7px}.runbar{display:flex;gap:8px;margin-top:12px}.log{min-height:100px;max-height:170px;overflow:auto;background:#121c2c;color:#d5e0ef;border-radius:7px;padding:10px;font-size:12px}.log>div{margin-bottom:5px}.log time{color:#8ea2bd}.log small{display:block;color:#9eafc5;margin-left:59px}.log-failure{color:#ff9d9d}.log-success{color:#a5e0b0}.muted{font-size:12px;color:#8894a5}
+.log .open-result{display:block;margin:5px 0 7px 58px;padding:3px 7px;font-size:11px}
+.edit-actions{display:flex;gap:8px;margin:12px 16px 0}.edit-actions .add{margin:0}
+/* ============================================================
+   控件树改版（专业工具风）：本段选择器带 .tree-area/.tree 前缀提高优先级，覆盖上方旧规则
+   ============================================================ */
+
+/* --- 头部：标题 + 计数徽章 + 展开/收起全部 + 搜索 --- */
+.tree-area .tree-head { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-top: 1px solid #e9edf2; justify-content: flex-start; }
+.tree-area .tree-head h3 { margin: 0; font-size: 13px; font-weight: 600; color: #1f2733; }
+.tree-count { flex: none; min-width: 20px; height: 17px; padding: 0 6px; border-radius: 9px; background: #eef1f6; color: #5c6b81; font-size: 11px; font-weight: 600; line-height: 17px; text-align: center; }
+.tree-actions { display: flex; gap: 2px; margin-left: auto; flex: none; }
+.icon-btn { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 6px; background: none; color: #5c6b81; cursor: pointer; transition: background-color .12s ease, color .12s ease; }
+.icon-btn:hover:not(:disabled) { background: #e9edf3; color: #305ec8; }
+.icon-btn:disabled { opacity: .4; cursor: default; }
+
+/* --- 搜索框：内嵌放大镜与清空按钮，聚焦时品牌蓝描边 --- */
+.tree-search-box { position: relative; flex: none; display: flex; align-items: center; }
+.tree-search-icon { position: absolute; left: 8px; color: #8a94a6; pointer-events: none; }
+.tree-area .tree-search-box input { width: 172px; height: 26px; padding: 0 24px 0 27px; border: 1px solid transparent; border-radius: 7px; background: #f2f4f8; font-family: inherit; font-size: 12px; color: #2b3442; outline: none; transition: background-color .12s ease, border-color .12s ease, box-shadow .12s ease; }
+.tree-area .tree-search-box input::placeholder { color: #98a2b3; }
+.tree-area .tree-search-box input:focus { background: #fff; border-color: #305ec8; box-shadow: 0 0 0 3px rgba(48, 94, 200, .12); }
+.tree-search-clear { position: absolute; right: 4px; display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; padding: 0; border: 0; border-radius: 50%; background: none; color: #8a94a6; cursor: pointer; }
+.tree-search-clear:hover { background: #e1e6ee; color: #2b3442; }
+
+/* --- 搜索匹配栏 --- */
+.tree-area .tree-match { display: flex; align-items: center; justify-content: space-between; margin: 0; padding: 5px 12px; font-size: 12px; color: #66758b; border-top: 1px solid #eef1f6; }
+.tree-match-clear { padding: 2px 6px; border: 0; border-radius: 5px; background: none; font-size: 12px; color: #305ec8; cursor: pointer; }
+.tree-match-clear:hover { background: #e8effc; }
+
+/* --- 树行：紧凑 26px 行高，缩进引导线（16px 一列）由行内 background-size 限定到自身缩进宽度，避免画满整行 --- */
+.tree .tree-empty { padding: 20px 16px; font-size: 12px; text-align: center; line-height: 1.7; }
+.tree .tree-row { position: relative; display: flex; align-items: center; gap: 5px; height: 26px; padding: 0 12px 0 0; font-size: 12px; color: #2b3442; cursor: pointer; white-space: nowrap; border-bottom: 0; content-visibility: auto; contain-intrinsic-size: auto 26px; transition: background-color .12s ease; background-image: repeating-linear-gradient(to right, #e3e8f0 0 1px, transparent 1px 16px); background-repeat: no-repeat; background-position: 6px 0; }
+.tree .tree-row:not(.selected):not(.hovered):hover { background-color: #f4f6f9; }
+/* 截图悬浮联动行：淡橙底与截图上的橙色预览框呼应，暗示两个视图指向同一控件 */
+.tree .tree-row.hovered { background-color: #fff6e8; }
+.tree .tree-row.selected { background-color: #e8effc; }
+.tree .tree-row.selected::before { content: ''; position: absolute; left: 0; top: 5px; bottom: 5px; width: 3px; border-radius: 0 2px 2px 0; background: #305ec8; }
+/* 纯结构节点（无文字/描述）：标签弱化，便于扫读时跳过 */
+.tree .tree-row.structural .tree-label { color: #66758b; font-weight: 400; }
+
+/* --- 展开箭头：SVG 旋转过渡，叶子占位保持缩进对齐 --- */
+.tree .tree-toggle { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 26px; padding: 0; border: 0; background: none; color: #7c8798; cursor: pointer; }
+.tree .tree-toggle.leaf { visibility: hidden; cursor: default; }
+.tree .tree-toggle svg { transition: transform .15s ease; }
+.tree .tree-row[data-expanded='true'] .tree-toggle svg { transform: rotate(90deg); }
+.tree .tree-toggle:not(.leaf):hover { color: #305ec8; }
+
+/* --- 行内信息：主标签弹性占宽，#id 等宽短名，右侧类型短名 --- */
+.tree .tree-label { flex: 1 1 auto; min-width: 48px; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
+.tree .tree-id { flex: 0 1 auto; max-width: 42%; overflow: hidden; text-overflow: ellipsis; font-family: ui-monospace, SFMono-Regular, Consolas, 'Courier New', monospace; font-size: 11px; color: #8a94a6; }
+.tree .tree-type { flex: none; max-width: 96px; overflow: hidden; text-overflow: ellipsis; font-size: 11px; color: #98a2b3; }
+/* ============================================================
+   布局改版：三栏检视器（手机画面全高 | 详情+控件树 | 任务编辑）
+   最小三列宽度合计 1010px，适配窗口 minWidth 1100 不溢出
+   ============================================================ */
+.workspace { grid-template-columns: minmax(280px, 29%) minmax(280px, 26%) minmax(450px, 1fr); }
+
+/* 中栏：当前选择是首个元素，无需与上方分隔；其余规则（max-height 上限、内部滚动）复用 */
+.inspector-side .selection { border-top: 0; }
+
+/* ============================================================
+   实时投屏：canvas 画面 + 模式切换 + 状态浮层
+   ============================================================ */
+
+/* 画面与原 <img> 同规则：等比缩放、居中、深色舞台；touch-action 关闭避免拖拽触发浏览器手势 */
+.image-stage canvas { max-height: 100%; max-width: 100%; object-fit: contain; box-shadow: 0 8px 24px #0007; touch-action: none; }
+.image-stage canvas.control { cursor: crosshair; }
+.image-stage canvas.inspect { cursor: crosshair; }
+
+/* 面板头工具组：模式切换（分段按钮）+ 刷新按钮 */
+.panel-tools { display: flex; align-items: center; gap: 8px; }
+.mode-switch { display: inline-flex; border: 1px solid #cbd3df; border-radius: 7px; overflow: hidden; }
+.mode-switch button { border: 0; border-radius: 0; padding: 6px 12px; background: #fff; }
+.mode-switch button + button { border-left: 1px solid #cbd3df; }
+.mode-switch button.active { background: #305ec8; border-color: #305ec8; color: #fff; }
+.mode-switch button:disabled { opacity: .5; }
+
+/* 状态浮层：建立中 / 已停止 / 出错，盖在画面上方 */
+.mirror-overlay { position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; background: #202a39e6; color: #d5e0ef; font-size: 13px; line-height: 1.6; padding: 20px; text-align: center; }
+.mirror-overlay.error { color: #ffb0b0; }
+/* 角标提示：旋转后层级过期 / 任务运行中禁用手动操控 */
+.mirror-badge { position: absolute; left: 20px; top: 14px; z-index: 2; background: #ffb02e; color: #4a3300; border-radius: 6px; padding: 2px 8px; font-size: 11px; }

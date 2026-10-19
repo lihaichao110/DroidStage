@@ -1,0 +1,46 @@
+{
+  "name": "android-auto-desk",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Android UI automation desktop client",
+  "main": "./out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "tsc --noEmit && electron-vite build",
+    "test": "vitest run",
+    "stage:agent": "node scripts/stage-agent.mjs",
+    "dist:win": "npm run build && node scripts/verify-release.mjs win && electron-builder --win nsis",
+    "dist:mac": "npm run build && node scripts/verify-release.mjs mac && electron-builder --mac dmg zip"
+  },
+  "dependencies": {
+    "fast-xml-parser": "^5.0.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "electron": "44.8.0",
+    "electron-builder": "26.15.3",
+    "electron-vite": "6.0.0",
+    "typescript": "^5.9.3",
+    "vite": "^8.0.0",
+    "vitest": "^5.0.5"
+  },
+  "build": {
+    "appId": "dev.androidautodesk.app",
+    "productName": "AndroidAutoDesk",
+    "directories": { "output": "release" },
+    "files": ["out/**/*", "package.json"],
+    "extraResources": [
+      { "from": "assets/agent", "to": "agent" },
+      { "from": "assets/adb", "to": "adb" },
+      { "from": "assets/mirroring", "to": "mirroring" }
+    ],
+    "win": { "target": ["nsis"], "arch": ["x64"] },
+    "mac": { "target": ["dmg", "zip"], "category": "public.app-category.developer-tools" },
+    "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true }
+  }
+}
