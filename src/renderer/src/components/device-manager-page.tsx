@@ -14,6 +14,8 @@ export function DeviceManagerPage({ fleet, batch, onFocus }: Props) {
   const [pairAddress, setPairAddress] = useState('')
   const [pairCode, setPairCode] = useState('')
   const [connectAddress, setConnectAddress] = useState('')
+  const [legacySerial, setLegacySerial] = useState('')
+  const [legacyIp, setLegacyIp] = useState('')
   const isRunning = Boolean(batch && !batch.finishedAt)
   const visible = fleet.devices.filter((device) => {
     if (filter === 'connected' && !fleet.connectedSerials.includes(device.serial)) return false
@@ -39,9 +41,10 @@ export function DeviceManagerPage({ fleet, batch, onFocus }: Props) {
         </tbody></table></div>
       </section>
       <aside className="page-card wireless-card">
-        <h3>无线 ADB</h3><p>手机与电脑需处于可互通的网络。Android 11+ 可在开发者选项的“无线调试”中查看以下信息；Android 10 请使用 USB。</p>
-        <div className="wireless-section"><h4>1. 配对设备</h4><label>配对地址和端口<input placeholder="192.168.1.10:37123" value={pairAddress} onChange={(event) => setPairAddress(event.target.value)} /></label><label>六位配对码<input inputMode="numeric" type="password" autoComplete="off" maxLength={6} value={pairCode} onChange={(event) => setPairCode(event.target.value)} /></label><button disabled={fleet.wirelessBusy || !pairAddress || !pairCode} onClick={() => { void fleet.pairWireless(pairAddress, pairCode).then((ok) => { if (ok) setPairCode('') }) }}>配对</button></div>
-        <div className="wireless-section"><h4>2. 连接设备</h4><p>使用无线调试主页面显示的连接端口，通常与配对端口不同。</p><label>连接地址和端口<input placeholder="192.168.1.10:38901" value={connectAddress} onChange={(event) => setConnectAddress(event.target.value)} /></label><button className="primary" disabled={fleet.wirelessBusy || !connectAddress} onClick={() => void fleet.connectWireless(connectAddress)}>连接无线设备</button></div>
+        <h3>无线 ADB</h3><p>手机与电脑需处于可互通的可信局域网。选择与手机系统兼容的方式。</p>
+        <div className="wireless-section"><h4>Android 10 及以下：USB 转无线</h4><p>启用时需连接 USB 并在手机上允许调试；切换后可拔线，手机重启后可能需要重新启用。Android 9 及以下目前只能建立 ADB 连接，辅助 APK 尚不支持运行任务。</p><label>已授权的 USB 设备<select value={legacySerial} onChange={(event) => setLegacySerial(event.target.value)}><option value="">选择设备</option>{fleet.devices.filter((device) => device.usb && device.state === 'device').map((device) => <option key={device.serial} value={device.serial}>{device.model || 'Android 设备'} · {device.serial}</option>)}</select></label><label>手机局域网 IP<input placeholder="192.168.1.10" value={legacyIp} onChange={(event) => setLegacyIp(event.target.value)} /></label><button className="primary" disabled={isRunning || fleet.wirelessBusy || !legacySerial || !legacyIp} onClick={() => void fleet.enableLegacyWireless(legacySerial, legacyIp)}>切换并连接无线设备</button></div>
+        <div className="wireless-section"><h4>Android 11+：配对设备</h4><label>配对地址和端口<input placeholder="192.168.1.10:37123" value={pairAddress} onChange={(event) => setPairAddress(event.target.value)} /></label><label>六位配对码<input inputMode="numeric" type="password" autoComplete="off" maxLength={6} value={pairCode} onChange={(event) => setPairCode(event.target.value)} /></label><button disabled={fleet.wirelessBusy || !pairAddress || !pairCode} onClick={() => { void fleet.pairWireless(pairAddress, pairCode).then((ok) => { if (ok) setPairCode('') }) }}>配对</button></div>
+        <div className="wireless-section"><h4>连接已配对设备</h4><p>使用无线调试主页面显示的连接端口，通常与配对端口不同。</p><label>连接地址和端口<input placeholder="192.168.1.10:38901" value={connectAddress} onChange={(event) => setConnectAddress(event.target.value)} /></label><button className="primary" disabled={fleet.wirelessBusy || !connectAddress} onClick={() => void fleet.connectWireless(connectAddress)}>连接无线设备</button></div>
         {fleet.errors[connectAddress.trim()] && <p className="inline-error">{fleet.errors[connectAddress.trim()]}</p>}
       </aside>
     </div>
@@ -59,7 +62,12 @@ function DeviceRow({ device, fleet, batch, isRunning, onFocus }: { device: Devic
     <td>{device.usb ? 'USB' : '无线'}</td><td><span className={`state-pill ${device.state === 'device' ? 'ok' : 'warn'}`}>{deviceState(device.state)}</span></td>
     <td><span className={`state-pill ${connected ? 'ok' : ''}`}>{connected ? '已连接' : '未连接'}</span></td>
     <td>{runStatus(taskStatus)}</td>
-    <td><div className="row-actions">{connected ? <button onClick={() => void fleet.disconnect(device.serial)} disabled={fleet.busySerial === device.serial || Boolean(isRunning && run && (run.status === 'pending' || run.status === 'running'))}>断开</button> : <button onClick={() => void fleet.connect(device.serial)} disabled={fleet.busySerial === device.serial || device.state !== 'device'}>连接</button>}{connected && <button onClick={() => onFocus(device.serial)} disabled={isRunning}>设为编辑设备</button>}</div></td>
+    <td><div className="row-actions">{connected
+      ? <button onClick={() => void fleet.disconnect(device.serial)} disabled={fleet.busySerial === device.serial || Boolean(isRunning && run && (run.status === 'pending' || run.status === 'running'))}>断开</button>
+      : device.state === 'device'
+        ? <button onClick={() => void fleet.connect(device.serial)} disabled={fleet.busySerial === device.serial}>连接</button>
+        // 无线设备离线只需重新 adb connect（serial 即端点）；USB 离线插线即恢复，无需按钮。
+        : !device.usb && <button onClick={() => void fleet.reconnectWireless(device.serial)} disabled={fleet.wirelessBusy}>重连</button>}{connected && <button onClick={() => onFocus(device.serial)} disabled={isRunning}>设为编辑设备</button>}</div></td>
   </tr>
 }
 

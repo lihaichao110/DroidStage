@@ -5,6 +5,7 @@ const api: AppApi = {
   listDevices: () => ipcRenderer.invoke('devices:list'),
   pairWireless: (address: string, code: string) => ipcRenderer.invoke('devices:pair-wireless', address, code),
   connectWireless: (address: string) => ipcRenderer.invoke('devices:connect-wireless', address),
+  enableLegacyWireless: (serial: string, ip: string) => ipcRenderer.invoke('devices:legacy-wireless', serial, ip),
   connect: (serial: string) => ipcRenderer.invoke('device:connect', serial),
   disconnect: (serial: string) => ipcRenderer.invoke('device:disconnect', serial),
   sessionStates: () => ipcRenderer.invoke('device:states'),

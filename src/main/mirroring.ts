@@ -56,8 +56,9 @@ export class MirrorService {
     const server = new ScrcpyServer(serial, options)
     let delivered = false
     server.onData = (chunk: Buffer) => {
+      // Electron 的 webContents getter 在窗口销毁后也会抛错，必须先检查窗口本身
+      if (window.isDestroyed()) return
       const contents = window.webContents
-      // 窗口销毁（退出中）后停止推送；server 由 before-quit 的 stop 统一清理
       if (contents.isDestroyed()) return
       if (!delivered) {
         delivered = true
@@ -99,8 +100,11 @@ export class MirrorService {
 
   /** 状态只随最新事件走；窗口销毁（退出中）时静默丢弃。 */
   private status(value: MirrorStatus): void {
-    const contents = this.window?.webContents
-    if (contents && !contents.isDestroyed() && this.serial) contents.send('mirror:status', { serial: this.serial, status: value })
+    const window = this.window
+    // socket 的退出回调可能晚于窗口销毁，访问 webContents 前先判断窗口
+    if (!window || window.isDestroyed() || !this.serial) return
+    const contents = window.webContents
+    if (!contents.isDestroyed()) contents.send('mirror:status', { serial: this.serial, status: value })
   }
 }
 

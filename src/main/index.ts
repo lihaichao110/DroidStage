@@ -8,7 +8,7 @@ import { listDevices } from './adb'
 import { DeviceRegistry } from './device-registry'
 import { BatchCoordinator } from './batch-coordinator'
 import { MirrorRegistry } from './mirror-registry'
-import { connectWireless, pairWireless } from './wireless-adb'
+import { connectWireless, enableLegacyWireless, pairWireless, validateLegacyIp } from './wireless-adb'
 import { validateSelector, validateTask } from '../shared/task'
 import { controlScroll, controlTouchEvents } from '../shared/touch'
 import { AKEYCODE_HOME, encodeBackClick, encodeKeyClick, encodeScrollEvent, encodeTouchEvent } from '../shared/utils/scrcpy-control-msg'
@@ -17,7 +17,12 @@ import type { AutomationTask, ScrollInput, Selector, TouchInput } from '../share
 let window: BrowserWindow | null = null
 const devices = new DeviceRegistry()
 const mirrors = new MirrorRegistry()
-const batches = new BatchCoordinator(devices, (item) => { window?.webContents.send('run:event', item) })
+const batches = new BatchCoordinator(devices, (item) => {
+  // 任务回调可能晚于窗口关闭，webContents getter 此时也会抛错
+  if (!window || window.isDestroyed()) return
+  const contents = window.webContents
+  if (!contents.isDestroyed()) contents.send('run:event', item)
+})
 
 function createWindow(): void {
   window = new BrowserWindow({
@@ -26,6 +31,10 @@ function createWindow(): void {
     minWidth: 1100,
     minHeight: 700,
     title: 'DroidStage',
+    // 开发模式运行的是 Electron 自带的可执行文件，需单独指定窗口图标。
+    icon: process.platform === 'win32' && !app.isPackaged
+      ? path.join(app.getAppPath(), 'src/renderer/src/assets/droidstage-icon.ico')
+      : undefined,
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),
       contextIsolation: true,
@@ -46,6 +55,15 @@ app.whenReady().then(() => {
   ipcMain.handle('devices:list', () => listDevices())
   ipcMain.handle('devices:pair-wireless', (_event, address: string, code: string) => pairWireless(address, code))
   ipcMain.handle('devices:connect-wireless', (_event, address: string) => connectWireless(address))
+  ipcMain.handle('devices:legacy-wireless', async (_event, serial: string, ip: string) => {
+    if (batches.isRunning(serial)) throw new Error('该设备正在运行任务，不能切换无线连接')
+    validateLegacyIp(ip)
+    const usb = (await listDevices()).find((device) => device.serial === serial && device.usb && device.state === 'device')
+    if (!usb) throw new Error('请先通过 USB 连接手机并允许调试授权')
+    await mirrors.stop(serial)
+    await devices.disconnect(serial)
+    return enableLegacyWireless(serial, ip)
+  })
   ipcMain.handle('device:connect', async (_event, serial: string) => {
     if (batches.isRunning(serial)) throw new Error('该设备正在运行任务，不能重新连接')
     await devices.connect(serial)

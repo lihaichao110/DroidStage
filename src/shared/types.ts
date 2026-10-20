@@ -1,8 +1,11 @@
+/**
+ * 主进程与渲染进程共用的任务、设备、事件和 IPC 类型。
+ */
 export type Selector = { kind: 'resourceId' | 'description' | 'text' | 'className'; value: string }
 export type Point = { x: number; y: number }
 export type Bounds = { left: number; top: number; right: number; bottom: number }
 
-export type Step =
+export type BasicStep =
   | { id: string; type: 'tap'; selector?: Selector; point?: Point; timeoutMs: number }
   | { id: string; type: 'input'; selector: Selector; text: string; timeoutMs: number }
   | { id: string; type: 'swipe'; from: Point; to: Point; durationMs: number }
@@ -10,6 +13,19 @@ export type Step =
   | { id: string; type: 'assert'; selector: Selector; exists: boolean }
   | { id: string; type: 'screenshot' }
   | { id: string; type: 'key'; key: 'back' | 'home' }
+
+export type ConditionStep = {
+  id: string
+  type: 'condition'
+  selector: Selector
+  whenPresent: BasicStep[]
+  whenAbsent: BasicStep[]
+} & (
+  | { mode: 'once' }
+  | { mode: 'repeatUntilPresent'; maxChecks: number; intervalMs: number }
+)
+
+export type Step = BasicStep | ConditionStep
 
 export type AutomationTask = {
   version: 1
@@ -83,6 +99,7 @@ export type AppApi = {
   listDevices(): Promise<Device[]>
   pairWireless(address: string, code: string): Promise<void>
   connectWireless(address: string): Promise<void>
+  enableLegacyWireless(serial: string, ip: string): Promise<{ serial: string; sdk: number }>
   connect(serial: string): Promise<void>
   disconnect(serial: string): Promise<void>
   sessionStates(): Promise<SessionState[]>

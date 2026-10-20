@@ -1,3 +1,6 @@
+/**
+ * 任务格式与控件定位纯逻辑测试。
+ */
 import { describe, expect, it } from 'vitest'
 import { crossAppWarning, findNodeAt, mapClientToScreen, mapScreenToRect, stepTypeName, suggestedSelector, validateTask } from '../src/shared/task'
 import { parseHierarchy } from '../src/main/hierarchy'
@@ -34,6 +37,27 @@ describe('任务格式', () => {
     expect(() => validateTask({ version: 1, name: 'x', packageName: 'a.b', steps: [
       { id: 'a', type: 'tap', selector: { kind: 'text', value: 'x' }, point: { x: 1, y: 1 }, timeoutMs: 1000 }
     ] })).toThrow()
+  })
+
+  it('兼容旧版任务，并接受空分支及手填的当前不存在目标', () => {
+    const steps = [
+      { id: 'old', type: 'assert', selector: { kind: 'text', value: '旧步骤' }, exists: false },
+      { id: 'condition', type: 'condition', selector: { kind: 'text', value: '关注' }, mode: 'repeatUntilPresent', maxChecks: 20, intervalMs: 1000,
+        whenPresent: [], whenAbsent: [{ id: 'swipe', type: 'swipe', from: { x: 300, y: 700 }, to: { x: 300, y: 300 }, durationMs: 500 }] }
+    ]
+    const task = { version: 1, name: '找关注按钮', steps }
+    expect(() => validateTask(task)).not.toThrow()
+    expect(() => validateTask(JSON.parse(JSON.stringify(task)))).not.toThrow()
+  })
+
+  it('条件参数、嵌套、重复 ID 和累计 500 步上限均受校验', () => {
+    const base = { id: 'condition', type: 'condition', selector: { kind: 'text', value: '关注' }, mode: 'repeatUntilPresent', maxChecks: 20, intervalMs: 1000, whenPresent: [], whenAbsent: [] }
+    const wrap = (step: unknown) => ({ version: 1, name: '测试', steps: [step] })
+    expect(() => validateTask(wrap({ ...base, maxChecks: 101 }))).toThrow('检查次数')
+    expect(() => validateTask(wrap({ ...base, intervalMs: 99 }))).toThrow('超时时间')
+    expect(() => validateTask(wrap({ ...base, whenAbsent: [{ ...base, id: 'nested' }] }))).toThrow('暂不支持嵌套')
+    expect(() => validateTask(wrap({ ...base, whenAbsent: [{ id: 'condition', type: 'screenshot' }] }))).toThrow('重复')
+    expect(() => validateTask(wrap({ ...base, whenAbsent: Array.from({ length: 500 }, (_, index) => ({ id: `shot-${index}`, type: 'screenshot' })) }))).toThrow('1–500')
   })
 })
 
@@ -88,5 +112,6 @@ describe('录制辅助', () => {
     expect(stepTypeName('assert')).toBe('断言控件')
     expect(stepTypeName('screenshot')).toBe('保存截图')
     expect(stepTypeName('key')).toBe('按键')
+    expect(stepTypeName('condition')).toBe('条件判断')
   })
 })

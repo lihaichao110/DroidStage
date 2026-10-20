@@ -3,11 +3,12 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import type { AutomationTask, BatchRecord, Device, HierarchySnapshot, Point, Selector, Step, UiNode } from '../../../shared/types'
-import { crossAppWarning, suggestedSelector, validateTask } from '../../../shared/task'
+import { crossAppWarning, suggestedSelector, validateSelector, validateTask } from '../../../shared/task'
 import { InspectorPanel } from './inspector-panel'
 import { WorkflowPanel } from './workflow-panel'
 import { StepSettings } from './step-settings'
 import { useTaskActions } from '../hooks/use-task-actions'
+import { useConditionDraft } from '../hooks/use-condition-draft'
 
 type EditorAction = Step['type']
 const defaultTask: AutomationTask = { version: 1, name: '新任务', packageName: '', steps: [] }
@@ -38,6 +39,7 @@ export function TaskEditorPage({ active, devices, connectedSerials, focused, tar
   const [text, setText] = useState('')
   const [timeout, setTimeoutValue] = useState(10000)
   const [exists, setExists] = useState(true)
+  const conditionDraft = useConditionDraft()
   const [key, setKey] = useState<'back' | 'home'>('back')
   const [swipeFrom, setSwipeFrom] = useState<Point>({ x: 300, y: 700 })
   const [swipeTo, setSwipeTo] = useState<Point>({ x: 300, y: 300 })
@@ -117,6 +119,15 @@ export function TaskEditorPage({ active, devices, connectedSerials, focused, tar
         const count = await window.androidAutoDesk.count(focused, selector)
         if (count > 1) throw new Error(`当前定位条件匹配 ${count} 个控件，需要更具体的定位条件`)
         step = action === 'wait' ? { id, type: 'wait', selector, exists, timeoutMs: timeout } : { id, type: 'assert', selector, exists }
+      } else if (action === 'condition') {
+        validateSelector(selector)
+        // 条件目标可以当前不存在，但已出现多个匹配时必须先改进定位方式。
+        if (connected && focused) {
+          const count = await window.androidAutoDesk.count(focused, selector)
+          if (!Number.isInteger(count) || count < 0) throw new Error('控件匹配数量无效')
+          if (count > 1) throw new Error(`当前定位条件匹配 ${count} 个控件，需要更具体的定位条件`)
+        }
+        step = conditionDraft.build(id, selector)
       } else if (action === 'screenshot') {
         step = { id, type: 'screenshot' }
       } else {
@@ -126,6 +137,7 @@ export function TaskEditorPage({ active, devices, connectedSerials, focused, tar
       validateTask(next)
       setTask(next)
       setEditingId(null)
+      if (action === 'condition') conditionDraft.reset()
       // 只对按控件定位的步骤做跨应用提醒：坐标点击已有布局变化风险提示，swipe/key/screenshot 不涉及控件归属
       const warning = ('selector' in step && step.selector) ? crossAppWarning(selectedNode?.packageName, task.packageName?.trim()) : null
       if (warning) setMessage(warning)
@@ -142,6 +154,7 @@ export function TaskEditorPage({ active, devices, connectedSerials, focused, tar
     if ('timeoutMs' in step) setTimeoutValue(step.timeoutMs)
     if (step.type === 'input') setText(step.text)
     if (step.type === 'wait' || step.type === 'assert') setExists(step.exists)
+    if (step.type === 'condition') conditionDraft.load(step)
     if (step.type === 'swipe') { setSwipeFrom(step.from); setSwipeTo(step.to); setSwipeDuration(step.durationMs) }
     if (step.type === 'key') setKey(step.key)
     setMessage('正在修改步骤；选择新控件可替换原定位条件。')
@@ -153,6 +166,11 @@ export function TaskEditorPage({ active, devices, connectedSerials, focused, tar
     const steps = [...task.steps]
       ;[steps[index], steps[target]] = [steps[target], steps[index]]
     setTask({ ...task, steps })
+  }
+  function startNewStep(): void {
+    setEditingId(null)
+    conditionDraft.reset()
+    setMessage('在右侧配置新步骤。')
   }
   const { save, load, run, saveAndRun } = useTaskActions({ task, setTask, setEditingId, setMessage, targets, onBatchStarted })
 
@@ -187,7 +205,7 @@ export function TaskEditorPage({ active, devices, connectedSerials, focused, tar
         activeStepId={editingId}
         isRunning={running}
         onTaskChange={setTask}
-        onNewStep={() => { setEditingId(null); setMessage('在右侧配置新步骤。') }}
+        onNewStep={startNewStep}
         onEditStep={editStep}
         onMoveStep={moveStep}
       />
@@ -199,6 +217,11 @@ export function TaskEditorPage({ active, devices, connectedSerials, focused, tar
         text={text}
         timeout={timeout}
         exists={exists}
+        conditionMode={conditionDraft.mode}
+        maxChecks={conditionDraft.maxChecks}
+        intervalMs={conditionDraft.intervalMs}
+        whenPresent={conditionDraft.whenPresent}
+        whenAbsent={conditionDraft.whenAbsent}
         keyValue={key}
         swipeFrom={swipeFrom}
         swipeTo={swipeTo}
@@ -215,6 +238,11 @@ export function TaskEditorPage({ active, devices, connectedSerials, focused, tar
         onTextChange={setText}
         onTimeoutChange={setTimeoutValue}
         onExistsChange={setExists}
+        onConditionModeChange={conditionDraft.setMode}
+        onMaxChecksChange={conditionDraft.setMaxChecks}
+        onIntervalMsChange={conditionDraft.setIntervalMs}
+        onWhenPresentChange={conditionDraft.setWhenPresent}
+        onWhenAbsentChange={conditionDraft.setWhenAbsent}
         onKeyChange={setKey}
         onSwipeFromChange={setSwipeFrom}
         onSwipeToChange={setSwipeTo}
@@ -223,7 +251,7 @@ export function TaskEditorPage({ active, devices, connectedSerials, focused, tar
         onSelectNode={selectNode}
         onHoverNode={setHoverNode}
         onAddStep={() => void addStep()}
-        onCancelEdit={() => setEditingId(null)}
+        onCancelEdit={startNewStep}
       />
     </main>}
     {runReview && active && <div className="modal-backdrop" role="presentation" onClick={() => setRunReview(null)}>

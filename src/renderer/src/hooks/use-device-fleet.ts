@@ -68,6 +68,49 @@ export function useDeviceFleet(setMessage: (message: string) => void) {
     finally { setWirelessBusy(false) }
   }
 
+  /** USB 授权后启用旧版 TCP/IP 调试，再按无线序列号建立任务会话。 */
+  async function enableLegacyWireless(serial: string, ip: string): Promise<void> {
+    setBusySerial(serial)
+    setWirelessBusy(true)
+    try {
+      // 开发中的页面可能热更新，但已打开窗口的预加载脚本仍是旧版本。
+      const enableWireless = window.androidAutoDesk?.enableLegacyWireless
+      if (typeof enableWireless !== 'function') throw new Error('应用版本未更新，请完全退出并重新启动')
+      const { serial: endpoint, sdk } = await enableWireless(serial, ip)
+      if (sdk >= 29) await window.androidAutoDesk.connect(endpoint)
+      setErrors((current) => { const next = { ...current }; delete next[serial]; delete next[endpoint]; return next })
+      if (sdk >= 29) setFocused(endpoint)
+      setTargets((current) => current.map((item) => item === serial && sdk >= 29 ? endpoint : item).filter((item) => item !== serial))
+      await refresh()
+      setMessage(sdk >= 29 ? `已通过 USB 授权并连接无线设备 ${endpoint}（API ${sdk}）` : `无线 ADB 已连接 ${endpoint}（API ${sdk}）；当前辅助 APK 要求 Android 10/API 29，暂不能运行任务`)
+    } catch (error) {
+      setErrors((current) => ({ ...current, [serial]: errorText(error) }))
+      setMessage(errorText(error))
+      await refresh()
+    } finally { setBusySerial(''); setWirelessBusy(false) }
+  }
+
+  /** 对已离线的无线设备重新执行 adb connect；serial 本身就是 ip:port 端点，无需再插 USB。 */
+  async function reconnectWireless(serial: string): Promise<void> {
+    setWirelessBusy(true)
+    try {
+      await window.androidAutoDesk.connectWireless(serial)
+      setErrors((current) => { const next = { ...current }; delete next[serial]; return next })
+      // Android 9 及以下按设计不支持任务会话，ADB 层恢复即达成本按钮目的；会话失败不算重连失败。
+      let sessionReady = true
+      try { await window.androidAutoDesk.connect(serial) } catch { sessionReady = false }
+      if (sessionReady) {
+        if (!focused) setFocused(serial)
+        if (!connectedSerials.length) setTargets([serial])
+      }
+      await refresh()
+      setMessage(sessionReady ? `已重新连接无线设备 ${serial}` : `无线 ADB 已重新连接 ${serial}；会话未建立，可在列表中手动连接`)
+    } catch (error) {
+      setErrors((current) => ({ ...current, [serial]: errorText(error) }))
+      setMessage(`重连失败：${errorText(error)}`)
+    } finally { setWirelessBusy(false) }
+  }
+
   function toggleTarget(serial: string): void {
     if (!connectedSerials.includes(serial)) return
     setTargets((current) => current.includes(serial) ? current.filter((item) => item !== serial) : [...current, serial])
@@ -75,7 +118,7 @@ export function useDeviceFleet(setMessage: (message: string) => void) {
 
   function selectTargets(serials: string[]): void { setTargets(serials.filter((serial) => connectedSerials.includes(serial))) }
 
-  return { devices, connectedSerials, targets, focused, busySerial, wirelessBusy, errors, refresh, connect, disconnect, pairWireless, connectWireless, toggleTarget, selectTargets, setFocused }
+  return { devices, connectedSerials, targets, focused, busySerial, wirelessBusy, errors, refresh, connect, disconnect, pairWireless, connectWireless, enableLegacyWireless, reconnectWireless, toggleTarget, selectTargets, setFocused }
 }
 
 function errorText(error: unknown): string { return error instanceof Error ? error.message : String(error) }

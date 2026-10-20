@@ -37,8 +37,8 @@ export class DeviceSession {
 
   private async initialize(): Promise<void> {
     const sdk = Number((await adb(onDevice(this.serial, ['shell', 'getprop', 'ro.build.version.sdk']))).toString().trim())
-    if (!Number.isFinite(sdk) || sdk < 29) throw new Error('需要 Android 10 或更高版本')
-    if (this.serial.includes(':') && sdk < 30) throw new Error('无线连接需要 Android 11 或更高版本；Android 10 请使用 USB')
+    if (!Number.isInteger(sdk) || sdk < 1) throw new Error('无法读取手机的 Android API 等级')
+    if (sdk < 29) throw new Error(`当前设备为 Android API ${sdk}；自动化辅助 APK 要求 Android 10/API 29 或更高版本`)
     const root = app.isPackaged ? path.join(process.resourcesPath, 'agent') : path.join(app.getAppPath(), 'assets', 'agent')
     const hostApk = path.join(root, 'host.apk')
     const testApk = path.join(root, 'test.apk')

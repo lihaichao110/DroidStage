@@ -2,6 +2,7 @@
  * 任务流程面板：按执行顺序展示步骤，并提供编辑、排序与运行记录。
  */
 import type { AutomationTask, Step } from '../../../shared/types'
+import { stepTypeName } from '../../../shared/task'
 
 type WorkflowPanelProps = {
   task: AutomationTask
@@ -19,6 +20,7 @@ const STEP_META: Record<Step['type'], { icon: string; title: string; help: strin
   swipe: { icon: '↕', title: '滑动屏幕', help: '从起点滑动到终点' },
   wait: { icon: '◷', title: '等待控件', help: '等待目标控件出现或消失' },
   assert: { icon: '✓', title: '断言控件', help: '核验目标控件的存在状态' },
+  condition: { icon: '◇', title: '条件判断', help: '按控件存在状态执行不同动作' },
   screenshot: { icon: '▣', title: '保存截图', help: '保存当前设备画面' },
   key: { icon: '↶', title: '按下按键', help: '向设备发送返回或 Home' }
 }
@@ -55,7 +57,12 @@ export function WorkflowPanel({ task, activeStepId, isRunning, onTaskChange, onN
             <span className={`flow-number${activeStepId === step.id ? ' selected' : ''}`}>{index + 1 + Number(Boolean(task.packageName))}</span>
             <div className={`flow-card${activeStepId === step.id ? ' selected' : ''}`}>
               <span className="flow-icon">{meta.icon}</span>
-              <div className="flow-copy"><strong>{meta.title}</strong><small>{meta.help}</small><div className="flow-detail"><span>步骤目标</span><b>{stepDetail(step)}</b></div></div>
+              <div className="flow-copy"><strong>{meta.title}</strong><small>{meta.help}</small><div className="flow-detail"><span>步骤目标</span><b>{stepDetail(step)}</b></div>
+                {step.type === 'condition' && <div className="flow-branches">
+                  <span>存在时：{branchDetail(step.whenPresent)}</span>
+                  <span>不存在时：{branchDetail(step.whenAbsent)}{step.mode === 'repeatUntilPresent' ? '，然后重新检查' : ''}</span>
+                </div>}
+              </div>
               <div className="flow-actions">
                 <button title="编辑步骤" aria-label={`编辑步骤 ${index + 1}`} onClick={() => onEditStep(step)} disabled={isRunning}>⋯</button>
                 <div className="flow-menu">
@@ -84,7 +91,13 @@ function stepDetail(step: Step): string {
     case 'swipe': return `(${step.from.x}, ${step.from.y}) → (${step.to.x}, ${step.to.y})`
     case 'wait': return `${step.selector.value} · ${step.exists ? '出现' : '消失'}`
     case 'assert': return `${step.selector.value} · ${step.exists ? '存在' : '不存在'}`
+    case 'condition': return `${step.selector.value} · ${step.mode === 'once' ? '判断一次' : `最多检查 ${step.maxChecks} 次`}`
     case 'screenshot': return '当前设备画面'
     case 'key': return step.key === 'back' ? '返回' : 'Home'
   }
+}
+
+/** 按执行顺序概览分支动作，空分支明确显示为跳过。 */
+function branchDetail(actions: Exclude<Step, { type: 'condition' }>[]): string {
+  return actions.length ? actions.map((action) => stepTypeName(action.type)).join(' → ') : '跳过'
 }
