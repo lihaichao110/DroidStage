@@ -37,7 +37,7 @@ export class AgentClient {
     return new Promise<T>((resolve, reject) => {
       const timer = setTimeout(() => {
         this.pending.delete(id)
-        reject(new Error(`操作超时：${op}`))
+        reject(new Error(`操作超时：${op}（${Math.round(timeoutMs / 1000)} 秒未收到手机端响应）`))
       }, timeoutMs)
       this.pending.set(id, { resolve: resolve as (value: unknown) => void, reject, timer })
       this.socket.write(JSON.stringify({ id, token: this.token, op, args }) + '\n')
@@ -47,6 +47,9 @@ export class AgentClient {
   async count(selector: Selector): Promise<number> {
     return this.request<number>('count', { selector })
   }
+
+  /** 供多设备列表判断 socket 是否仍存活，避免把已断线设备显示为已连接。 */
+  isConnected(): boolean { return !this.closed }
 
   close(): void {
     if (this.closed) return

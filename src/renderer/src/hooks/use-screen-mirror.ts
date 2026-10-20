@@ -9,7 +9,7 @@ import { mapClientToScreen } from '../../../shared/task'
 import { currentDeviceSize, frameToPoint, type Size } from '../../../shared/touch'
 import { VideoPipeline } from '../utils/video-pipeline'
 
-export function useScreenMirror(isConnected: boolean, interactive: boolean) {
+export function useScreenMirror(serial: string, isConnected: boolean, interactive: boolean, quality: 'editor' | 'wall' = 'editor') {
   const api = window.androidAutoDesk
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [status, setStatus] = useState<MirrorStatus>({ state: 'stopped' })
@@ -48,18 +48,19 @@ export function useScreenMirror(isConnected: boolean, interactive: boolean) {
 
   // 连接后自动开启投屏；断开或卸载时停止并释放管线
   useEffect(() => {
-    if (!isConnected) return
+    if (!isConnected || !serial) return
     setStatus({ state: 'starting' })
     pipelineRef.current = createPipeline()
-    const offStatus = api.onMirrorStatus(setStatus)
+    const offStatus = api.onMirrorStatus((item) => { if (item.serial === serial) setStatus(item.status) })
     const offStream = api.onMirrorStream((meta) => {
+      if (meta.serial !== serial) return
       physicalRef.current = { width: meta.physicalWidth, height: meta.physicalHeight }
       // 新流（重试/重连）从 IDR 开始：管线连同看门狗、解码器一并重置
       pipelineRef.current?.dispose()
       pipelineRef.current = createPipeline()
     })
-    const offChunk = api.onMirrorChunk((bytes) => pipelineRef.current?.feed(bytes))
-    void api.startMirroring().catch((error) => setStatus({ state: 'error', message: error instanceof Error ? error.message : String(error) }))
+    const offChunk = api.onMirrorChunk((item) => { if (item.serial === serial) pipelineRef.current?.feed(item.bytes) })
+    void api.startMirroring(serial, quality).catch((error) => setStatus({ state: 'error', message: error instanceof Error ? error.message : String(error) }))
     return () => {
       offStatus()
       offStream()
@@ -72,10 +73,10 @@ export function useScreenMirror(isConnected: boolean, interactive: boolean) {
       physicalRef.current = null
       frameSizeRef.current = null
       setFrameSize(null)
-      void api.stopMirroring()
+      void api.stopMirroring(serial)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- drawFrame 只引用 ref 与稳定的 setter
-  }, [isConnected])
+  }, [serial, isConnected, quality])
 
   /** 手动注入失败不致命（下一次手势即可重试），仅告警不弹错误浮层。 */
   const touchError = (error: unknown): void => { console.warn('触摸注入失败', error) }
@@ -118,7 +119,7 @@ export function useScreenMirror(isConnected: boolean, interactive: boolean) {
     const frame = frameSizeRef.current
     if (!points.length || !draggingRef.current || !frame) return
     movesRef.current = []
-    void api.sendTouch({ action: 'move', points, frameWidth: frame.width, frameHeight: frame.height }).catch(touchError)
+    void api.sendTouch(serial, { action: 'move', points, frameWidth: frame.width, frameHeight: frame.height }).catch(touchError)
   }
 
   const onPointerDown = useCallback((event: React.PointerEvent<HTMLCanvasElement>): void => {
@@ -126,7 +127,7 @@ export function useScreenMirror(isConnected: boolean, interactive: boolean) {
     // 中键映射 HOME（跟随 scrcpy 默认）；preventDefault 抑制浏览器的中键自动滚动
     if (event.button === 1) {
       event.preventDefault()
-      void api.sendKey('home').catch(touchError)
+      void api.sendKey(serial, 'home').catch(touchError)
       return
     }
     if (event.button !== 0) return
@@ -135,8 +136,8 @@ export function useScreenMirror(isConnected: boolean, interactive: boolean) {
     event.currentTarget.setPointerCapture(event.pointerId)
     draggingRef.current = true
     movesRef.current = []
-    void api.sendTouch({ action: 'down', ...input }).catch(touchError)
-  }, [clientToFrame])
+    void api.sendTouch(serial, { action: 'down', ...input }).catch(touchError)
+  }, [clientToFrame, serial])
 
   const onPointerMove = useCallback((event: React.PointerEvent<HTMLCanvasElement>): void => {
     if (!draggingRef.current) return
@@ -144,7 +145,7 @@ export function useScreenMirror(isConnected: boolean, interactive: boolean) {
     if (!input) return
     movesRef.current.push({ x: input.x, y: input.y })
     if (!rafRef.current) rafRef.current = requestAnimationFrame(flushMoves)
-  }, [clientToFrame])
+  }, [clientToFrame, serial])
 
   const onPointerUp = useCallback((event: React.PointerEvent<HTMLCanvasElement>): void => {
     if (!draggingRef.current) return
@@ -155,12 +156,12 @@ export function useScreenMirror(isConnected: boolean, interactive: boolean) {
     movesRef.current = []
     // 先补发未合并的轨迹再抬手，保证拖拽轨迹完整
     if (points.length && frame) {
-      void api.sendTouch({ action: 'move', points, frameWidth: frame.width, frameHeight: frame.height }).catch(touchError)
+      void api.sendTouch(serial, { action: 'move', points, frameWidth: frame.width, frameHeight: frame.height }).catch(touchError)
     }
     const input = clientToFrame(event.clientX, event.clientY)
       ?? (points.length && frame ? { x: points[points.length - 1].x, y: points[points.length - 1].y, frameWidth: frame.width, frameHeight: frame.height } : null)
-    if (input) void api.sendTouch({ action: 'up', ...input }).catch(touchError)
-  }, [clientToFrame])
+    if (input) void api.sendTouch(serial, { action: 'up', ...input }).catch(touchError)
+  }, [clientToFrame, serial])
 
   const onPointerCancel = useCallback((event: React.PointerEvent<HTMLCanvasElement>): void => {
     if (!draggingRef.current) return
@@ -171,8 +172,8 @@ export function useScreenMirror(isConnected: boolean, interactive: boolean) {
     movesRef.current = []
     const input = clientToFrame(event.clientX, event.clientY)
       ?? (points.length && frame ? { x: points[points.length - 1].x, y: points[points.length - 1].y, frameWidth: frame.width, frameHeight: frame.height } : null)
-    if (input) void api.sendTouch({ action: 'cancel', ...input }).catch(touchError)
-  }, [clientToFrame])
+    if (input) void api.sendTouch(serial, { action: 'cancel', ...input }).catch(touchError)
+  }, [clientToFrame, serial])
 
   // 滚轮与右键需要 preventDefault，React 合成事件挂在根节点且 wheel 为 passive，必须用原生监听
   useEffect(() => {
@@ -185,12 +186,12 @@ export function useScreenMirror(isConnected: boolean, interactive: boolean) {
       if (!input) return
       // deltaMode 归一化为滚轮格数：像素模式（Chrome/Edge 默认）每格 100px，行模式（Firefox 可选）一行即一格
       const dy = event.deltaMode === WheelEvent.DOM_DELTA_LINE ? event.deltaY : event.deltaY / 100
-      void api.sendScroll({ ...input, dy }).catch(touchError)
+      void api.sendScroll(serial, { ...input, dy }).catch(touchError)
     }
     const onContextMenu = (event: MouseEvent): void => {
       if (!interactiveRef.current) return
       event.preventDefault()
-      void api.sendKey('back').catch(touchError)
+      void api.sendKey(serial, 'back').catch(touchError)
     }
     canvas.addEventListener('wheel', onWheel, { passive: false })
     canvas.addEventListener('contextmenu', onContextMenu)
@@ -198,13 +199,13 @@ export function useScreenMirror(isConnected: boolean, interactive: boolean) {
       canvas.removeEventListener('wheel', onWheel)
       canvas.removeEventListener('contextmenu', onContextMenu)
     }
-  }, [clientToFrame])
+  }, [clientToFrame, serial])
 
   /** 出错后手动重试：主进程 start 会先停旧实例再交付新端口。 */
   const restart = useCallback(() => {
     setStatus({ state: 'starting' })
-    void api.startMirroring().catch((error) => setStatus({ state: 'error', message: error instanceof Error ? error.message : String(error) }))
-  }, [])
+    void api.startMirroring(serial, quality).catch((error) => setStatus({ state: 'error', message: error instanceof Error ? error.message : String(error) }))
+  }, [serial, quality])
 
   return { canvasRef, status, frameSize, restart, clientToDevice, pointerHandlers: { onPointerDown, onPointerMove, onPointerUp, onPointerCancel } }
 }

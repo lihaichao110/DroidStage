@@ -16,14 +16,14 @@ export class TaskRunner {
   cancel(): void { this.cancelled = true }
   isRunning(): boolean { return this.running }
 
-  async run(task: AutomationTask, session: DeviceSession, emit: (event: RunEvent) => void): Promise<void> {
+  async run(task: AutomationTask, session: DeviceSession, emit: (event: RunEvent) => void, context?: { batchId: string; serial: string; runDir: string }): Promise<void> {
     if (this.running) throw new Error('已有任务在运行')
     validateTask(task)
     this.running = true
     this.cancelled = false
-    const runDir = path.join(app.getPath('userData'), 'runs', `${new Date().toISOString().replace(/[:.]/g, '-')}-${randomUUID().slice(0, 8)}`)
+    const runDir = context?.runDir ?? path.join(app.getPath('userData'), 'runs', `${new Date().toISOString().replace(/[:.]/g, '-')}-${randomUUID().slice(0, 8)}`)
     const event = async (kind: RunEvent['kind'], message: string, stepIndex?: number): Promise<void> => {
-      const item: RunEvent = { kind, at: new Date().toISOString(), message, stepIndex, runDir }
+      const item: RunEvent = { kind, at: new Date().toISOString(), message, stepIndex, runDir, batchId: context?.batchId, serial: context?.serial }
       await appendFile(path.join(runDir, 'events.jsonl'), JSON.stringify(item) + '\n', 'utf8')
       emit(item)
     }

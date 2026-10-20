@@ -12,6 +12,7 @@ import { HighlightBox, type StageBox } from './stage-box'
 export type MirrorMode = 'control' | 'inspect'
 
 type ScreenMirrorProps = {
+  serial: string
   snapshot: HierarchySnapshot | null
   selectedNode: UiNode | null
   hoverNode: UiNode | null
@@ -27,9 +28,9 @@ type ScreenMirrorProps = {
 // 快照与投屏帧宽高比差异超过 2% 视为旋转后层级过期
 const STALE_ASPECT = 0.02
 
-export function ScreenMirror({ snapshot, selectedNode, hoverNode, isConnected, isBusy, isTaskRunning, mode, onPick, onHoverNode, onRefresh }: ScreenMirrorProps) {
+export function ScreenMirror({ serial, snapshot, selectedNode, hoverNode, isConnected, isBusy, isTaskRunning, mode, onPick, onHoverNode, onRefresh }: ScreenMirrorProps) {
   const interactive = mode === 'control' && !isTaskRunning
-  const { canvasRef, status, frameSize, restart, clientToDevice, pointerHandlers } = useScreenMirror(isConnected, interactive)
+  const { canvasRef, status, frameSize, restart, clientToDevice, pointerHandlers } = useScreenMirror(serial, isConnected, interactive)
   const [stageBox, setStageBox] = useState<StageBox | null>(null)
   const staleNotified = useRef(false)
 
@@ -49,10 +50,10 @@ export function ScreenMirror({ snapshot, selectedNode, hoverNode, isConnected, i
     return () => observer.disconnect()
   }, [canvasRef, frameSize])
 
-  // 快照与当前帧方向不一致说明旋转后未刷新，拾取模式下自动刷新一次
+  // 快照与当前帧方向不一致说明旋转后未刷新，拾取模式下自动刷新一次；任务运行中连接被步骤占用，不自动触发
   const isStale = Boolean(snapshot && frameSize && Math.abs(snapshot.width / snapshot.height - frameSize.width / frameSize.height) > STALE_ASPECT)
   useEffect(() => {
-    if (mode !== 'inspect' || !isStale || isBusy || staleNotified.current) return
+    if (mode !== 'inspect' || !isStale || isBusy || isTaskRunning || staleNotified.current) return
     staleNotified.current = true
     onRefresh()
   }, [mode, isStale, isBusy, onRefresh])

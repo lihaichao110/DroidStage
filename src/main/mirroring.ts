@@ -6,12 +6,13 @@
  */
 import type { BrowserWindow } from 'electron'
 import { adb, onDevice } from './adb'
-import { ScrcpyServer } from './scrcpy-server'
+import { ScrcpyServer, type ScrcpyOptions } from './scrcpy-server'
 import type { MirrorStatus } from '../shared/types'
 
 export class MirrorService {
   private server: ScrcpyServer | null = null
   private window: BrowserWindow | null = null
+  private serial: string | null = null
   // start/stop 串行队列：渲染端重载或 React 开发模式会连发 start/stop，并发交错
   // 会泄漏 server 进程、或让旧实例的退出回调干扰新一轮投屏，必须按到达顺序执行
   private queue: Promise<unknown> = Promise.resolve()
@@ -20,8 +21,8 @@ export class MirrorService {
    * 开始投屏；已在投屏时先停止再重启（渲染进程重载后订阅已重建，重启以重新下发流）。
    * @throws 设备物理分辨率读取失败或 server 启动失败时抛出
    */
-  start(window: BrowserWindow, serial: string): Promise<void> {
-    return this.enqueue(() => this.doStart(window, serial))
+  start(window: BrowserWindow, serial: string, options?: ScrcpyOptions): Promise<void> {
+    return this.enqueue(() => this.doStart(window, serial, options))
   }
 
   stop(): Promise<void> {
@@ -45,13 +46,14 @@ export class MirrorService {
     return run
   }
 
-  private async doStart(window: BrowserWindow, serial: string): Promise<void> {
+  private async doStart(window: BrowserWindow, serial: string, options?: ScrcpyOptions): Promise<void> {
     console.log(`[投屏] 启动：${serial}`)
     await this.doStop(false)
     this.window = window
+    this.serial = serial
     this.status({ state: 'starting' })
     const physical = await readPhysicalSize(serial)
-    const server = new ScrcpyServer(serial)
+    const server = new ScrcpyServer(serial, options)
     let delivered = false
     server.onData = (chunk: Buffer) => {
       const contents = window.webContents
@@ -60,12 +62,12 @@ export class MirrorService {
       if (!delivered) {
         delivered = true
         // 流起始消息先于首块数据发出（同一 webContents 的 IPC 按发送顺序送达）
-        contents.send('mirror:stream', physical)
+        contents.send('mirror:stream', { serial, ...physical })
         this.status({ state: 'streaming' })
         console.log(`[投屏] 开始推流：${physical.physicalWidth}x${physical.physicalHeight}，首块 ${chunk.length}B`)
       }
       // Buffer 底层可能是共享池，克隆为独立视图再经结构化克隆下发（每块一次拷贝，开销可忽略）
-      contents.send('mirror:chunk', new Uint8Array(chunk))
+      contents.send('mirror:chunk', { serial, bytes: new Uint8Array(chunk) })
     }
     server.onExit = (message) => {
       // 只清理本次实例的引用：this.server 可能已被新一轮 start 接管
@@ -98,7 +100,7 @@ export class MirrorService {
   /** 状态只随最新事件走；窗口销毁（退出中）时静默丢弃。 */
   private status(value: MirrorStatus): void {
     const contents = this.window?.webContents
-    if (contents && !contents.isDestroyed()) contents.send('mirror:status', value)
+    if (contents && !contents.isDestroyed() && this.serial) contents.send('mirror:status', { serial: this.serial, status: value })
   }
 }
 

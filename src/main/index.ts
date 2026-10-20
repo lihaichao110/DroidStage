@@ -5,18 +5,19 @@ import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { listDevices } from './adb'
-import { DeviceSession } from './session'
-import { TaskRunner } from './runner'
-import { MirrorService } from './mirroring'
+import { DeviceRegistry } from './device-registry'
+import { BatchCoordinator } from './batch-coordinator'
+import { MirrorRegistry } from './mirror-registry'
+import { connectWireless, pairWireless } from './wireless-adb'
 import { validateSelector, validateTask } from '../shared/task'
 import { controlScroll, controlTouchEvents } from '../shared/touch'
 import { AKEYCODE_HOME, encodeBackClick, encodeKeyClick, encodeScrollEvent, encodeTouchEvent } from '../shared/utils/scrcpy-control-msg'
-import type { AutomationTask, ScrollInput, Selector, RunEvent, TouchInput } from '../shared/types'
+import type { AutomationTask, ScrollInput, Selector, TouchInput } from '../shared/types'
 
 let window: BrowserWindow | null = null
-let session: DeviceSession | null = null
-const runner = new TaskRunner()
-const mirror = new MirrorService()
+const devices = new DeviceRegistry()
+const mirrors = new MirrorRegistry()
+const batches = new BatchCoordinator(devices, (item) => { window?.webContents.send('run:event', item) })
 
 function createWindow(): void {
   window = new BrowserWindow({
@@ -40,53 +41,53 @@ function createWindow(): void {
   })
 }
 
-function requireSession(): DeviceSession {
-  if (!session) throw new Error('请先连接手机')
-  return session
-}
-
 app.whenReady().then(() => {
   createWindow()
   ipcMain.handle('devices:list', () => listDevices())
+  ipcMain.handle('devices:pair-wireless', (_event, address: string, code: string) => pairWireless(address, code))
+  ipcMain.handle('devices:connect-wireless', (_event, address: string) => connectWireless(address))
   ipcMain.handle('device:connect', async (_event, serial: string) => {
-    if (runner.isRunning()) throw new Error('任务运行中不能切换设备')
-    await mirror.stop()
-    await session?.close()
-    session = null
-    session = await DeviceSession.open(serial)
+    if (batches.isRunning(serial)) throw new Error('该设备正在运行任务，不能重新连接')
+    await devices.connect(serial)
   })
-  ipcMain.handle('device:disconnect', async () => {
-    if (runner.isRunning()) throw new Error('请先取消正在运行的任务')
-    await mirror.stop()
-    await session?.close()
-    session = null
+  ipcMain.handle('device:disconnect', async (_event, serial: string) => {
+    if (batches.isRunning(serial)) throw new Error('请先取消该设备正在运行的任务')
+    await mirrors.stop(serial)
+    await devices.disconnect(serial)
   })
   // 渲染进程重载后界面状态归零，但会话仍活在主进程；提供查询以便恢复 UI 与投屏
-  ipcMain.handle('device:state', () => ({ connected: session !== null, serial: session?.serial ?? null }))
-  ipcMain.handle('device:snapshot', () => requireSession().snapshot())
-  ipcMain.handle('device:count', (_event, selector: Selector) => {
+  ipcMain.handle('device:states', () => devices.states())
+  // 任务步骤与快照共用同一条代理连接，任务运行中刷新/校验会排队到长步骤之后等成超时，直接拒绝
+  ipcMain.handle('device:snapshot', (_event, serial: string) => {
+    if (batches.isRunning(serial)) throw new Error('任务运行中不能刷新层级')
+    return devices.require(serial).snapshot()
+  })
+  ipcMain.handle('device:count', (_event, serial: string, selector: Selector) => {
+    if (batches.isRunning(serial)) throw new Error('任务运行中不能校验控件')
     validateSelector(selector)
-    return requireSession().count(selector)
+    return devices.require(serial).count(selector)
   })
-  ipcMain.handle('mirror:start', async () => {
+  ipcMain.handle('mirror:start', async (_event, serial: string, quality: 'editor' | 'wall') => {
     if (!window) throw new Error('窗口未就绪')
-    await mirror.start(window, requireSession().serial)
+    devices.require(serial)
+    if (quality !== 'editor' && quality !== 'wall') throw new Error('未知投屏模式')
+    await mirrors.start(window, serial, quality)
   })
-  ipcMain.handle('mirror:stop', () => mirror.stop())
+  ipcMain.handle('mirror:stop', (_event, serial: string) => mirrors.stop(serial))
   // 手动操控三类输入统一编码为 scrcpy 控制消息直写控制通道（即发即弃），任务运行中禁止干预
-  ipcMain.handle('mirror:touch', (_event, input: TouchInput) => {
-    if (runner.isRunning()) throw new Error('任务运行中不能手动操控')
-    for (const touch of controlTouchEvents(input)) mirror.sendControl(encodeTouchEvent(touch))
+  ipcMain.handle('mirror:touch', (_event, serial: string, input: TouchInput) => {
+    if (batches.isRunning(serial)) throw new Error('任务运行中不能手动操控该设备')
+    for (const touch of controlTouchEvents(input)) mirrors.sendControl(serial, encodeTouchEvent(touch))
   })
-  ipcMain.handle('mirror:scroll', (_event, input: ScrollInput) => {
-    if (runner.isRunning()) throw new Error('任务运行中不能手动操控')
-    mirror.sendControl(encodeScrollEvent(controlScroll(input)))
+  ipcMain.handle('mirror:scroll', (_event, serial: string, input: ScrollInput) => {
+    if (batches.isRunning(serial)) throw new Error('任务运行中不能手动操控该设备')
+    mirrors.sendControl(serial, encodeScrollEvent(controlScroll(input)))
   })
-  ipcMain.handle('device:key', (_event, key: 'back' | 'home') => {
+  ipcMain.handle('device:key', (_event, serial: string, key: 'back' | 'home') => {
     if (key !== 'back' && key !== 'home') throw new Error('未知按键')
-    if (runner.isRunning()) throw new Error('任务运行中不能手动操控')
+    if (batches.isRunning(serial)) throw new Error('任务运行中不能手动操控该设备')
     // back 走 BACK_OR_SCREEN_ON：息屏时 server 自动转为电源键，右键即具备唤醒能力
-    for (const message of key === 'back' ? encodeBackClick() : encodeKeyClick(AKEYCODE_HOME)) mirror.sendControl(message)
+    for (const message of key === 'back' ? encodeBackClick() : encodeKeyClick(AKEYCODE_HOME)) mirrors.sendControl(serial, message)
   })
   ipcMain.handle('task:save', async (_event, task: AutomationTask) => {
     validateTask(task)
@@ -104,11 +105,10 @@ app.whenReady().then(() => {
     validateTask(task)
     return task
   })
-  ipcMain.handle('task:run', async (_event, task: AutomationTask) => {
-    const emit = (item: RunEvent): void => { window?.webContents.send('run:event', item) }
-    await runner.run(task, requireSession(), emit)
-  })
-  ipcMain.handle('task:cancel', () => runner.cancel())
+  ipcMain.handle('task:run', (_event, task: AutomationTask, serials: string[]) => batches.start(task, serials))
+  ipcMain.handle('task:cancel', (_event, serial?: string) => batches.cancel(serial))
+  ipcMain.handle('batch:state', () => batches.state())
+  ipcMain.handle('batch:list', () => batches.history())
   ipcMain.handle('run:open-dir', async (_event, directory: string) => {
     if (typeof directory !== 'string') throw new Error('结果目录无效')
     const root = path.resolve(app.getPath('userData'), 'runs')
@@ -122,5 +122,5 @@ app.whenReady().then(() => {
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow() })
 })
 
-app.on('before-quit', () => { void session?.close(); void mirror.stop() })
+app.on('before-quit', () => { void devices.closeAll(); void mirrors.stopAll() })
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit() })

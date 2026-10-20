@@ -61,32 +61,49 @@ export type RunEvent = {
   stepIndex?: number
   message: string
   runDir?: string
+  batchId?: string
+  serial?: string
 }
 
-/** 主进程持有的连接态：渲染进程重载（dev HMR/手动刷新）后据此恢复界面。 */
-export type SessionState = { connected: boolean; serial: string | null }
+/** 主进程持有的逐设备连接态，供页面重载后恢复。 */
+export type SessionState = { serial: string; connected: boolean }
+
+export type DeviceRunStatus = 'pending' | 'running' | 'success' | 'failure' | 'cancelled'
+export type DeviceRun = { serial: string; status: DeviceRunStatus; stepIndex?: number; error?: string; runDir?: string }
+export type BatchRecord = {
+  id: string
+  taskName: string
+  startedAt: string
+  finishedAt?: string
+  devices: DeviceRun[]
+  events: RunEvent[]
+}
 
 export type AppApi = {
   listDevices(): Promise<Device[]>
+  pairWireless(address: string, code: string): Promise<void>
+  connectWireless(address: string): Promise<void>
   connect(serial: string): Promise<void>
-  disconnect(): Promise<void>
-  sessionState(): Promise<SessionState>
-  snapshot(): Promise<HierarchySnapshot>
-  count(selector: Selector): Promise<number>
+  disconnect(serial: string): Promise<void>
+  sessionStates(): Promise<SessionState[]>
+  snapshot(serial: string): Promise<HierarchySnapshot>
+  count(serial: string, selector: Selector): Promise<number>
   saveTask(task: AutomationTask): Promise<string | null>
   loadTask(): Promise<AutomationTask | null>
-  runTask(task: AutomationTask): Promise<void>
-  cancelRun(): Promise<void>
+  runTask(task: AutomationTask, serials: string[]): Promise<BatchRecord>
+  cancelRun(serial?: string): Promise<void>
+  batchState(): Promise<BatchRecord | null>
+  listBatches(): Promise<BatchRecord[]>
   openRunDir(directory: string): Promise<void>
   onRunEvent(listener: (event: RunEvent) => void): () => void
-  startMirroring(): Promise<void>
-  stopMirroring(): Promise<void>
-  sendTouch(event: TouchInput): Promise<void>
-  sendScroll(input: ScrollInput): Promise<void>
-  sendKey(key: 'back' | 'home'): Promise<void>
+  startMirroring(serial: string, quality: 'editor' | 'wall'): Promise<void>
+  stopMirroring(serial: string): Promise<void>
+  sendTouch(serial: string, event: TouchInput): Promise<void>
+  sendScroll(serial: string, input: ScrollInput): Promise<void>
+  sendKey(serial: string, key: 'back' | 'home'): Promise<void>
   /** 订阅投屏流起始：meta 携带设备物理分辨率，其后视频字节经 onMirrorChunk 连续下发。 */
-  onMirrorStream(listener: (meta: { physicalWidth: number; physicalHeight: number }) => void): () => void
+  onMirrorStream(listener: (item: { serial: string; physicalWidth: number; physicalHeight: number }) => void): () => void
   /** 订阅投屏视频字节（连续的 H.264 流，按 socket 分块送达）。 */
-  onMirrorChunk(listener: (bytes: Uint8Array) => void): () => void
-  onMirrorStatus(listener: (status: MirrorStatus) => void): () => void
+  onMirrorChunk(listener: (item: { serial: string; bytes: Uint8Array }) => void): () => void
+  onMirrorStatus(listener: (item: { serial: string; status: MirrorStatus }) => void): () => void
 }

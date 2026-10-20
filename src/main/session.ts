@@ -17,13 +17,13 @@ export class DeviceSession {
   private client: AgentClient | null = null
   private hostPort: number | null = null
   private token: string | null = null
+  private snapshotInFlight: Promise<HierarchySnapshot> | null = null
 
   private constructor(serial: string) { this.serial = serial }
 
   static async open(serial: string): Promise<DeviceSession> {
     const device = (await listDevices()).find((item) => item.serial === serial)
     if (!device) throw new Error('设备已断开')
-    if (!device.usb) throw new Error('第一版仅支持 USB 连接')
     if (device.state !== 'device') throw new Error(device.state === 'unauthorized' ? '请在手机上允许 USB 调试授权' : `设备状态：${device.state}`)
     const session = new DeviceSession(serial)
     try {
@@ -38,6 +38,7 @@ export class DeviceSession {
   private async initialize(): Promise<void> {
     const sdk = Number((await adb(onDevice(this.serial, ['shell', 'getprop', 'ro.build.version.sdk']))).toString().trim())
     if (!Number.isFinite(sdk) || sdk < 29) throw new Error('需要 Android 10 或更高版本')
+    if (this.serial.includes(':') && sdk < 30) throw new Error('无线连接需要 Android 11 或更高版本；Android 10 请使用 USB')
     const root = app.isPackaged ? path.join(process.resourcesPath, 'agent') : path.join(app.getAppPath(), 'assets', 'agent')
     const hostApk = path.join(root, 'host.apk')
     const testApk = path.join(root, 'test.apk')
@@ -88,6 +89,9 @@ export class DeviceSession {
     return this.client
   }
 
+  /** 代理 socket 或 instrument 进程退出后立即把会话视为失效。 */
+  isAlive(): boolean { return Boolean(this.client?.isConnected() && this.process && this.process.exitCode === null) }
+
   async count(selector: Selector): Promise<number> { return this.agent().count(selector) }
 
   async screenshot(): Promise<Buffer> {
@@ -96,8 +100,21 @@ export class DeviceSession {
     return png
   }
 
+  /**
+   * 读取当前控件层级快照。
+   * 手机端单连接串行执行命令，并发 snapshot 只会在手机端排队堆积并连环超时，
+   * 因此在途请求期间复用同一次结果，落定后才允许发起下一次。
+   */
   async snapshot(): Promise<HierarchySnapshot> {
-    const xml = await this.agent().request<string>('snapshot', {}, 15000)
+    if (!this.snapshotInFlight) {
+      this.snapshotInFlight = this.takeSnapshot().finally(() => { this.snapshotInFlight = null })
+    }
+    return this.snapshotInFlight
+  }
+
+  private async takeSnapshot(): Promise<HierarchySnapshot> {
+    // 复杂界面（WebView 多、动效不停）的层级导出是对前台 App 的同步遍历，可超过 15 秒
+    const xml = await this.agent().request<string>('snapshot', {}, 30000)
     const nodes = parseHierarchy(xml)
     // 根窗口 bounds 的并集即当前方向的屏幕尺寸，省去一次数百毫秒的 screencap
     const width = Math.max(0, ...nodes.filter((node) => node.depth === 0).map((node) => node.bounds.right))

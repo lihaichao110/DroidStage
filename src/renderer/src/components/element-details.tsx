@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import type { Point, Selector, UiNode } from '../../../shared/types'
 
 type ElementDetailsProps = {
+  serial: string
   node: UiNode | null
   selector: Selector | null
   selectedPoint: Point | null
@@ -21,7 +22,7 @@ type MatchState =
   | { status: 'done'; count: number }
   | { status: 'error'; message: string }
 
-export function ElementDetails({ node, selector, selectedPoint, isConnected, onSelectorChange }: ElementDetailsProps) {
+export function ElementDetails({ serial, node, selector, selectedPoint, isConnected, onSelectorChange }: ElementDetailsProps) {
   const [match, setMatch] = useState<MatchState>({ status: 'idle' })
 
   const kind = selector?.kind
@@ -29,19 +30,19 @@ export function ElementDetails({ node, selector, selectedPoint, isConnected, onS
 
   useEffect(() => {
     // 未连接或没有定位条件时不查询；查询失败如实展示错误，不做静默降级
-    if (!isConnected || !selector) {
+    if (!isConnected || !serial || !selector) {
       setMatch({ status: 'idle' })
       return
     }
     setMatch({ status: 'loading' })
     const timer = setTimeout(() => {
-      window.androidAutoDesk.count(selector)
+      window.androidAutoDesk.count(serial, selector)
         .then((count) => setMatch({ status: 'done', count }))
         .catch((error: unknown) => setMatch({ status: 'error', message: error instanceof Error ? error.message : String(error) }))
     }, COUNT_DEBOUNCE_MS)
     return () => clearTimeout(timer)
     // 依赖取 kind/value 而非 selector 对象：同值新对象不重复查询
-  }, [isConnected, kind, value, selector])
+  }, [serial, isConnected, kind, value, selector])
 
   /** 切换定位方式：从选中控件取对应属性值；选“坐标”即清除控件定位。 */
   function changeKind(next: string): void {
