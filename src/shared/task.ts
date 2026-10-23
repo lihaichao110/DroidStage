@@ -107,12 +107,50 @@ function validateTimeout(timeoutMs: number): void {
   if (!Number.isInteger(timeoutMs) || timeoutMs < 100 || timeoutMs > 60000) throw new Error('超时时间必须为 100–60000 毫秒')
 }
 
-const stepTypeNames: Record<Step['type'], string> = {
-  tap: '点击', input: '输入文本', swipe: '滑动', wait: '等待控件', assert: '断言控件', screenshot: '保存截图', key: '按键', condition: '条件判断',
+const stepTitles: Record<Step['type'], string> = {
+  tap: '点击控件', input: '输入文本', swipe: '滑动屏幕', wait: '等待控件', assert: '断言控件',
+  condition: '条件判断', screenshot: '保存截图', key: '按下按键'
 }
 
-/** 步骤类型的中文动作名，用于运行日志与失败消息。 */
-export function stepTypeName(type: Step['type']): string { return stepTypeNames[type] }
+const selectorNames: Record<Selector['kind'], string> = {
+  resourceId: '资源 ID', description: '描述', text: '文字', className: '类名'
+}
+
+/** 步骤类型下拉选项：名称与任务流程卡、运行记录完全一致，避免同一动作出现多种叫法。 */
+export const stepTypeOptions: { value: Step['type']; label: string }[] = [
+  { value: 'tap', label: stepTitles.tap },
+  { value: 'input', label: stepTitles.input },
+  { value: 'swipe', label: stepTitles.swipe },
+  { value: 'wait', label: stepTitles.wait },
+  { value: 'assert', label: stepTitles.assert },
+  { value: 'condition', label: stepTitles.condition },
+  { value: 'screenshot', label: stepTitles.screenshot },
+  { value: 'key', label: stepTitles.key }
+]
+
+/** 返回任务流程卡与运行记录共用的动作名称。 */
+export function stepTitle(type: Step['type']): string { return stepTitles[type] }
+
+/** 返回任务流程卡与运行记录共用的目标摘要。 */
+export function stepDetail(step: Step): string {
+  const target = (selector: Selector): string => `${selectorNames[selector.kind]}：${selector.value}`
+  switch (step.type) {
+    case 'tap': return step.selector ? target(step.selector) : `坐标 (${step.point?.x}, ${step.point?.y})`
+    case 'input': return `${target(step.selector)} · ${step.text.length} 字`
+    case 'swipe': return `(${step.from.x}, ${step.from.y}) → (${step.to.x}, ${step.to.y})`
+    case 'wait': return `${target(step.selector)} · ${step.exists ? '出现' : '消失'}`
+    case 'assert': return `${target(step.selector)} · ${step.exists ? '存在' : '不存在'}`
+    case 'condition': return `${target(step.selector)} · ${step.mode === 'once' ? '判断一次' : `最多检查 ${step.maxChecks} 次`}`
+    case 'screenshot': return '当前设备画面'
+    case 'key': return step.key === 'back' ? '返回' : 'Home'
+  }
+}
+
+/** 将动作名称和目标合成运行记录所需的一行摘要。 */
+export function stepSummary(step: Step): string { return `${stepTitle(step.type)} · ${stepDetail(step)}` }
+
+/** 自动打开应用在流程卡中占第一步；内部 stepIndex 仍保持任务数组下标。 */
+export function flowStepNumber(index: number, packageName?: string): number { return index + 1 + Number(Boolean(packageName)) }
 
 /**
  * 生成“控件不属于目标 App”的录制警告文案。
@@ -127,7 +165,16 @@ export function crossAppWarning(nodePackageName: string | undefined, taskPackage
   return `注意：该控件属于「${nodePackageName}」而非目标 App「${taskPackageName}」。任务运行时会先自动启动目标 App，桌面图标等当前屏幕上的外部控件届时无法定位，请确认此步骤是否必要`
 }
 
-export function suggestedSelector(node: UiNode): Selector | null {
+/**
+ * 从当前快照建议可唯一定位的属性；可点击控件优先使用语义描述，减少动态资源 ID 失效。
+ * @param node 当前选中的控件
+ * @param nodes 当前快照的全部控件，用于判断描述是否唯一
+ * @returns 建议的定位条件；无可用属性时返回 null
+ */
+export function suggestedSelector(node: UiNode, nodes: readonly UiNode[]): Selector | null {
+  if (node.clickable && node.description.trim() && nodes.filter((candidate) => candidate.description === node.description).length === 1) {
+    return { kind: 'description', value: node.description }
+  }
   if (node.resourceId) return { kind: 'resourceId', value: node.resourceId }
   if (node.description) return { kind: 'description', value: node.description }
   if (node.text) return { kind: 'text', value: node.text }

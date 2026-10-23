@@ -3,6 +3,7 @@
  */
 import { useEffect, useState } from 'react'
 import type { AutomationTask, BasicStep, HierarchySnapshot, Point, Selector, Step, UiNode } from '../../../shared/types'
+import { stepTypeOptions } from '../../../shared/task'
 import { ElementDetails } from './element-details'
 import { HierarchyTree } from './hierarchy-tree'
 import { ConditionEditor } from './condition-editor'
@@ -81,7 +82,8 @@ export function StepSettings(props: StepSettingsProps) {
       <div className="setting-group">
         <h3>动作类型</h3>
         <label className="setting-field">选择动作<select value={action} onChange={(event) => props.onActionChange(event.target.value as EditorAction)}>
-          <option value="tap">点击</option><option value="input">输入文本</option><option value="swipe">滑动</option><option value="wait">等待控件</option><option value="assert">断言控件</option><option value="condition">条件判断</option><option value="screenshot">保存截图</option><option value="key">返回 / Home</option>
+          {/* 动作名称与任务流程卡、运行记录保持一致 */}
+          {stepTypeOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
         </select></label>
         {needsTarget && <div className="target-card"><span className="target-icon">⌖</span><div><strong>{selector?.value ?? (selectedPoint ? `坐标 (${selectedPoint.x}, ${selectedPoint.y})` : '尚未选择目标')}</strong><small>{selector ? `定位方式：${selector.kind}` : '在左侧切换至拾取元素，或从下方控件树中选择'}</small></div><button onClick={() => setTargetOpen(true)}>选择</button></div>}
         {(action === 'tap' || action === 'input' || action === 'wait') && <label className="setting-field">超时（毫秒）<input type="number" min="100" max="60000" value={timeout} onChange={(event) => props.onTimeoutChange(Number(event.target.value))} /></label>}

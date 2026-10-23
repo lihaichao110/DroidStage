@@ -3,7 +3,7 @@
  */
 import { useState } from 'react'
 import type { BasicStep, Point, Selector } from '../../../shared/types'
-import { stepTypeName, validateTask } from '../../../shared/task'
+import { stepSummary, stepTypeOptions, validateTask } from '../../../shared/task'
 
 type BranchActionsProps = {
   label: string
@@ -108,7 +108,7 @@ export function BranchActions(props: BranchActionsProps) {
     <div className="condition-branch-head"><strong>{label}</strong><button type="button" onClick={() => { setDraft(emptyDraft(conditionSelector)); props.onDraftChange(true); setError('') }}>添加动作</button></div>
     {actions.length === 0 && <p className="branch-empty">无动作：跳过此分支</p>}
     {actions.map((action, index) => <div className="branch-action-row" key={action.id}>
-      <span>{index + 1}. {stepTypeName(action.type)}{action.type === 'tap' && action.selector ? ` · ${action.selector.value}` : ''}</span>
+      <span>{index + 1}. {stepSummary(action)}</span>
       <button type="button" aria-label={`编辑${label}第${index + 1}个动作`} onClick={() => { setDraft(draftFromStep(action)); props.onDraftChange(true); setError('') }}>编辑</button>
       <button type="button" aria-label={`上移${label}第${index + 1}个动作`} disabled={index === 0} onClick={() => move(index, -1)}>↑</button>
       <button type="button" aria-label={`下移${label}第${index + 1}个动作`} disabled={index === actions.length - 1} onClick={() => move(index, 1)}>↓</button>
@@ -116,7 +116,8 @@ export function BranchActions(props: BranchActionsProps) {
     </div>)}
     {draft && <div className="branch-draft">
       <label className="setting-field">动作<select value={draft.type} onChange={(event) => change({ type: event.target.value as BasicStep['type'] })}>
-        <option value="tap">点击</option><option value="input">输入文本</option><option value="swipe">滑动</option><option value="wait">等待控件</option><option value="assert">断言控件</option><option value="screenshot">保存截图</option><option value="key">返回 / Home</option>
+        {/* 分支内不支持嵌套条件判断，选项沿用流程卡与运行记录的动作名称 */}
+        {stepTypeOptions.filter((option) => option.value !== 'condition').map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
       </select></label>
       {draft.type === 'tap' && <label className="setting-field">点击方式<select value={draft.tapTarget} onChange={(event) => change({ tapTarget: event.target.value as ActionDraft['tapTarget'] })}><option value="selector">控件</option><option value="point">坐标</option></select></label>}
       {needsSelector && <div className="branch-target">

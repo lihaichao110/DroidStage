@@ -37,7 +37,8 @@ describe('任务执行器', () => {
     await new TaskRunner().run(task, session, (event) => events.push(event))
     expect(order).toEqual(['launch', 'tap'])
     expect(events.at(-1)?.kind).toBe('success')
-    expect(events).toContainEqual(expect.objectContaining({ kind: 'step', message: '第 1 步：点击', stepIndex: 0 }))
+    expect(events[0]).toMatchObject({ kind: 'start', message: '第 1 步：打开应用 · 应用包名：com.example.app' })
+    expect(events).toContainEqual(expect.objectContaining({ kind: 'step', message: '第 2 步：点击控件 · 文字：继续', stepIndex: 0 }))
     const file = await readFile(path.join(events[0].runDir!, 'events.jsonl'), 'utf8')
     expect(file).toContain('任务执行成功')
   })
@@ -52,6 +53,7 @@ describe('任务执行器', () => {
     await new TaskRunner().run({ ...task, packageName: undefined }, session, (event) => events.push(event))
     expect(launch).not.toHaveBeenCalled()
     expect(events[0]).toMatchObject({ kind: 'start', message: '未指定目标 App，直接在当前界面执行' })
+    expect(events).toContainEqual(expect.objectContaining({ kind: 'step', message: '第 1 步：点击控件 · 文字：继续' }))
     expect(events.at(-1)?.kind).toBe('success')
   })
 
@@ -62,7 +64,7 @@ describe('任务执行器', () => {
       screenshot: vi.fn(async () => Buffer.from('fake png'))
     } as unknown as DeviceSession
     const events: RunEvent[] = []
-    await expect(new TaskRunner().run(task, session, (event) => events.push(event))).rejects.toThrow('第 1 步（点击）失败：未找到控件')
+    await expect(new TaskRunner().run(task, session, (event) => events.push(event))).rejects.toThrow('第 2 步（点击控件 · 文字：继续）失败：未找到控件')
     expect(events.at(-1)?.kind).toBe('failure')
     expect(events.at(-1)?.stepIndex).toBe(0)
     expect((await stat(path.join(events[0].runDir!, 'failure.png'))).size).toBe(8)
@@ -84,7 +86,7 @@ describe('任务执行器', () => {
       screenshot: vi.fn(async () => Buffer.from('fake png'))
     } as unknown as DeviceSession
     const events: RunEvent[] = []
-    await expect(new TaskRunner().run(multiStep, session, (event) => events.push(event))).rejects.toThrow('第 2 步（滑动）失败：滑动失败')
+    await expect(new TaskRunner().run(multiStep, session, (event) => events.push(event))).rejects.toThrow('第 3 步（滑动屏幕 · (200, 600) → (200, 400)）失败：滑动失败')
     expect(events.at(-1)?.stepIndex).toBe(1)
     expect(request).toHaveBeenCalledTimes(2) // swipe 失败后第 3 步不再执行
   })
@@ -107,7 +109,11 @@ describe('条件判断执行', () => {
     const events: RunEvent[] = []
     await new TaskRunner().run({ version: 1, name: '单次', steps: [condition] }, session, (event) => events.push(event))
     expect(request.mock.calls.map(([op]) => op)).toEqual([expected])
+    expect(session.count).toHaveBeenCalledWith(condition.selector, 2000)
     expect(events.some((event) => event.message.includes(count === 1 ? '存在时' : '不存在时'))).toBe(true)
+    expect(events).toContainEqual(expect.objectContaining({ message: '第 1 步：条件判断 · 文字：关注 · 判断一次', stepIndex: 0 }))
+    expect(events).toContainEqual(expect.objectContaining({ message: `第 1 步：条件判断 · 文字：关注 · 判断一次 · 第 1/1 次检查（最多等待 2 秒），匹配 ${count} 个控件`, stepIndex: 0 }))
+    expect(events.some((event) => event.message.includes(count === 1 ? '点击控件 · 文字：关注' : '滑动屏幕 · (300, 700) → (300, 300)'))).toBe(true)
     expect(events.at(-1)?.kind).toBe('success')
   })
 
@@ -122,6 +128,11 @@ describe('条件判断执行', () => {
     ]
     await new TaskRunner().run({ version: 1, name: '循环', steps }, session, (event) => events.push(event))
     expect(count).toHaveBeenCalledTimes(3)
+    expect(count.mock.calls).toEqual([
+      [condition.selector, 0],
+      [condition.selector, 0],
+      [condition.selector, 0]
+    ])
     expect(request.mock.calls.map(([op]) => op)).toEqual(['swipe', 'swipe', 'tap', 'key'])
     expect(events.some((event) => event.message.includes('第 3/3 次检查'))).toBe(true)
   })
@@ -171,12 +182,12 @@ describe('条件判断执行', () => {
     const querySession = {
       count: vi.fn(async () => { throw new Error('设备断开') }), agent: () => ({ request: vi.fn() }), screenshot: vi.fn(async () => Buffer.from('fake png'))
     } as unknown as DeviceSession
-    await expect(new TaskRunner().run({ version: 1, name: '查询失败', steps: [condition] }, querySession, () => {})).rejects.toThrow('第 1 步（条件判断）失败：设备断开')
+    await expect(new TaskRunner().run({ version: 1, name: '查询失败', steps: [condition] }, querySession, () => {})).rejects.toThrow('第 1 步（条件判断 · 文字：关注 · 判断一次）失败：设备断开')
 
     const actionSession = {
       count: vi.fn(async () => 1), agent: () => ({ request: vi.fn(async () => { throw new Error('未找到控件') }) }), screenshot: vi.fn(async () => Buffer.from('fake png'))
     } as unknown as DeviceSession
-    await expect(new TaskRunner().run({ version: 1, name: '动作失败', steps: [condition] }, actionSession, () => {})).rejects.toThrow('「存在时」分支第 1 个动作（点击）失败：未找到控件')
+    await expect(new TaskRunner().run({ version: 1, name: '动作失败', steps: [condition] }, actionSession, () => {})).rejects.toThrow('「存在时」分支第 1 个动作（点击控件 · 文字：关注）失败：未找到控件')
   })
 
   it('取消重复查找时在下一次检查前停止', async () => {

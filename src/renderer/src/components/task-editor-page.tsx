@@ -91,7 +91,7 @@ export function TaskEditorPage({ active, devices, connectedSerials, focused, tar
   function selectNode(node: UiNode | null, point: Point | null): void {
     setSelectedNode(node)
     setSelectedPoint(point)
-    setSelector(node ? suggestedSelector(node) : null)
+    setSelector(node ? suggestedSelector(node, snapshot?.nodes ?? []) : null)
   }
 
   async function addStep(): Promise<void> {

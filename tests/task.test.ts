@@ -2,7 +2,7 @@
  * 任务格式与控件定位纯逻辑测试。
  */
 import { describe, expect, it } from 'vitest'
-import { crossAppWarning, findNodeAt, mapClientToScreen, mapScreenToRect, stepTypeName, suggestedSelector, validateTask } from '../src/shared/task'
+import { crossAppWarning, findNodeAt, flowStepNumber, mapClientToScreen, mapScreenToRect, stepDetail, stepSummary, stepTitle, stepTypeOptions, suggestedSelector, validateTask } from '../src/shared/task'
 import { parseHierarchy } from '../src/main/hierarchy'
 
 const node = {
@@ -62,10 +62,20 @@ describe('任务格式', () => {
 })
 
 describe('页面控件定位', () => {
-  it('优先生成资源 ID，并选中点击坐标处最小控件', () => {
+  it('可点击控件的描述唯一时优先推荐描述，并选中点击坐标处最小控件', () => {
     const root = { ...node, id: 'root', bounds: { left: 0, top: 0, right: 200, bottom: 200 } }
-    expect(suggestedSelector(node)).toEqual({ kind: 'resourceId', value: 'com.example:id/login' })
+    expect(suggestedSelector({ ...node, description: '登录' }, [root, { ...node, description: '登录' }]))
+      .toEqual({ kind: 'description', value: '登录' })
     expect(findNodeAt([root, node], 40, 40)?.id).toBe('0')
+  })
+
+  it('重复描述、无描述或不可点击时沿用资源 ID', () => {
+    const described = { ...node, description: '关注' }
+    expect(suggestedSelector(described, [described, { ...described, id: 'other' }]))
+      .toEqual({ kind: 'resourceId', value: 'com.example:id/login' })
+    expect(suggestedSelector(node, [node])).toEqual({ kind: 'resourceId', value: 'com.example:id/login' })
+    expect(suggestedSelector({ ...described, clickable: false }, [{ ...described, clickable: false }]))
+      .toEqual({ kind: 'resourceId', value: 'com.example:id/login' })
   })
 
   it('解析 UI Automator 的 XML 与 bounds', () => {
@@ -104,14 +114,20 @@ describe('录制辅助', () => {
     expect(crossAppWarning('com.miui.home', undefined)).toBeNull()
   })
 
-  it('步骤类型有对应的中文动作名', () => {
-    expect(stepTypeName('tap')).toBe('点击')
-    expect(stepTypeName('input')).toBe('输入文本')
-    expect(stepTypeName('swipe')).toBe('滑动')
-    expect(stepTypeName('wait')).toBe('等待控件')
-    expect(stepTypeName('assert')).toBe('断言控件')
-    expect(stepTypeName('screenshot')).toBe('保存截图')
-    expect(stepTypeName('key')).toBe('按键')
-    expect(stepTypeName('condition')).toBe('条件判断')
+  it('步骤类型下拉选项与流程卡、运行记录使用同一套名称', () => {
+    expect(stepTypeOptions.map((option) => option.label)).toEqual(['点击控件', '输入文本', '滑动屏幕', '等待控件', '断言控件', '条件判断', '保存截图', '按下按键'])
+    expect(stepTypeOptions.every((option) => option.label === stepTitle(option.value))).toBe(true)
+  })
+
+  it('流程卡与运行记录共用动作、目标摘要和包含启动步骤的编号', () => {
+    const tap = { id: 'tap', type: 'tap' as const, selector: { kind: 'description' as const, value: '抖音' }, timeoutMs: 1000 }
+    expect(stepTitle(tap.type)).toBe('点击控件')
+    expect(stepDetail(tap)).toBe('描述：抖音')
+    expect(stepSummary(tap)).toBe('点击控件 · 描述：抖音')
+    expect(stepSummary({ id: 'point', type: 'tap', point: { x: 10, y: 20 }, timeoutMs: 1000 })).toBe('点击控件 · 坐标 (10, 20)')
+    expect(stepSummary({ id: 'condition', type: 'condition', selector: { kind: 'resourceId', value: 'app:id/button' }, mode: 'once', whenPresent: [], whenAbsent: [] }))
+      .toBe('条件判断 · 资源 ID：app:id/button · 判断一次')
+    expect(flowStepNumber(0, 'com.example.app')).toBe(2)
+    expect(flowStepNumber(0)).toBe(1)
   })
 })

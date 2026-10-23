@@ -1,3 +1,6 @@
+/**
+ * 手机代理协议客户端：管理 JSON 行请求、响应关联与连接失效处理。
+ */
 import net from 'node:net'
 import type { Selector } from '../shared/types'
 
@@ -44,8 +47,14 @@ export class AgentClient {
     })
   }
 
-  async count(selector: Selector): Promise<number> {
-    return this.request<number>('count', { selector })
+  /**
+   * 查询匹配控件数量，可在首次未命中时等待控件树刷新。
+   * @param selector 控件定位条件
+   * @param waitMs 首次为零时最多继续等待的毫秒数；零表示立即返回
+   * @returns 最终匹配数量
+   */
+  async count(selector: Selector, waitMs = 0): Promise<number> {
+    return this.request<number>('count', { selector, waitMs })
   }
 
   /** 供多设备列表判断 socket 是否仍存活，避免把已断线设备显示为已连接。 */

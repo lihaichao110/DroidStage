@@ -1,3 +1,6 @@
+/**
+ * 设备会话管理：安装并连接手机代理，提供启动应用、控件查询和快照能力。
+ */
 import { app } from 'electron'
 import { randomBytes } from 'node:crypto'
 import type { ChildProcessWithoutNullStreams } from 'node:child_process'
@@ -92,7 +95,13 @@ export class DeviceSession {
   /** 代理 socket 或 instrument 进程退出后立即把会话视为失效。 */
   isAlive(): boolean { return Boolean(this.client?.isConnected() && this.process && this.process.exitCode === null) }
 
-  async count(selector: Selector): Promise<number> { return this.agent().count(selector) }
+  /**
+   * 查询匹配控件数量，并按需等待手机端控件树刷新。
+   * @param selector 控件定位条件
+   * @param waitMs 首次未命中时的最长等待时间；零表示立即返回
+   * @returns 最终匹配数量
+   */
+  async count(selector: Selector, waitMs = 0): Promise<number> { return this.agent().count(selector, waitMs) }
 
   async screenshot(): Promise<Buffer> {
     const png = await adb(onDevice(this.serial, ['exec-out', 'screencap', '-p']), 15000)

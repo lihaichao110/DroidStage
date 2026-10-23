@@ -44,6 +44,23 @@ npm run dist:mac
 
 ADB 源码：[AOSP 仓库](https://android.googlesource.com/platform/packages/modules/adb/)。Windows 驱动限制：[Android 官方说明](https://developer.android.com/studio/run/oem-usb)。
 
+## 自动发布
+
+GitHub Actions 在分支推送和 Pull Request 时继续运行桌面端与 Android 代理验证。正式发行由 `vX.Y.Z` 标签触发：标签必须指向 `main` 历史中的提交，且 `X.Y.Z` 与 `package.json` 的版本一致。发布工作流重新运行测试、构建 Android 辅助 APK，并分别在 Windows、macOS 上打包；五个安装包全部成功后，才创建 GitHub Release，同时附上 `SHA256SUMS.txt`。
+
+首次发布前，必须按自构建指南备齐并提交 `assets/adb/win32/`、`assets/adb/darwin-x64/`、`assets/adb/darwin-arm64/` 和 `assets/adb/THIRD_PARTY_NOTICES`。缺失时发行校验会失败，不会发布不完整的安装包。不要将 Google SDK Platform-Tools 的二进制代替自构建 ADB。准备就绪后按以下顺序发布：
+
+```text
+npm version <X.Y.Z> --no-git-tag-version
+# 提交 package.json、package-lock.json，合并到 main，等待验证通过
+git switch main
+git pull --ff-only
+git tag v<X.Y.Z>
+git push origin v<X.Y.Z>
+```
+
+Release 包含 Windows x64 NSIS 安装程序，以及 macOS Intel、Apple Silicon 各自的 DMG 和 ZIP。首版未签名、未做 Apple 公证；macOS 可能要求用户手动允许打开。标签版本不符、发行组件缺失、测试或任何平台构建失败时，不会发布正式 Release。
+
 ## 当前验证范围
 
 `npm run build` 和 `npm test` 验证桌面端代码。Android APK 必须成功构建后才能连接实体机；Windows/macOS 的 ADB 二进制、USB 驱动及 macOS 安装体验必须在对应系统与实体机上完成发行验收。

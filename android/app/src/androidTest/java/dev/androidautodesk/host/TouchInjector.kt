@@ -1,3 +1,6 @@
+/**
+ * 系统输入注入：把桌面端触摸与滚轮请求转换为 Android MotionEvent。
+ */
 package dev.androidautodesk.host
 
 import android.app.UiAutomation
@@ -89,8 +92,33 @@ class TouchInjector(private val automation: UiAutomation) {
 
     /** 构造单指触摸事件并异步注入；注入失败抛错，事件对象无论成败都回收。 */
     private fun injectEvent(action: Int, x: Float, y: Float) {
-        val event = MotionEvent.obtain(downTime, SystemClock.uptimeMillis(), action, x, y,
-            1f, 1f, 0, 1f, 1f, 0, 0, InputDevice.SOURCE_TOUCHSCREEN)
+        val properties = MotionEvent.PointerProperties().apply {
+            id = 0
+            toolType = MotionEvent.TOOL_TYPE_FINGER
+        }
+        val coordinates = MotionEvent.PointerCoords().apply {
+            this.x = x
+            this.y = y
+            pressure = 1f
+            size = 1f
+        }
+        // 完整重载才能显式声明触摸屏来源；简化重载不接受 source 参数。
+        val event = MotionEvent.obtain(
+            downTime,
+            SystemClock.uptimeMillis(),
+            action,
+            1,
+            arrayOf(properties),
+            arrayOf(coordinates),
+            0,
+            0,
+            1f,
+            1f,
+            0,
+            0,
+            InputDevice.SOURCE_TOUCHSCREEN,
+            0,
+        )
         try {
             if (!automation.injectInputEvent(event, false)) error("触摸注入失败")
         } finally {

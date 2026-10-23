@@ -97,6 +97,8 @@ node scripts/verify-release.mjs win     # 或 mac
 
 校验通过后再执行 `npm run dist:win` / `npm run dist:mac` 打包。
 
+自动发布前，还需将三个平台的自构建 ADB 目录、生成的 `manifest.json` 和 `assets/adb/THIRD_PARTY_NOTICES` 一起提交到仓库。GitHub Actions 从标签对应的提交读取这些文件，不会在发布时从 Google SDK 下载 ADB；任何平台文件或许可清单缺失，发行校验都会失败。
+
 ## 常见问题
 
 - **磁盘不够**：`repo sync` 加 `--depth=1 -c` 只拉当前分支浅克隆；仍不足则只能扩容，没有更小的合规路线。

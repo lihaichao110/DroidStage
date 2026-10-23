@@ -12,6 +12,7 @@ export function RunsPage({ batch, history, onCancel, onOpenResult }: Props) {
   const records = batch ? [batch, ...history.filter((item) => item.id !== batch.id)] : history
   const record = records.find((item) => item.id === selectedBatchId) ?? records[0]
   const device = record?.devices.find((item) => item.serial === selectedSerial) ?? record?.devices[0]
+  const currentAction = record?.events.filter((event) => event.serial === device?.serial && (event.kind === 'start' || event.kind === 'step')).at(-1)?.message
   const isActive = Boolean(record && batch?.id === record.id && !record.finishedAt)
   const done = record?.devices.filter((item) => !['pending', 'running'].includes(item.status)).length ?? 0
 
@@ -24,7 +25,7 @@ export function RunsPage({ batch, history, onCancel, onOpenResult }: Props) {
         <div className="run-device-list">{record.devices.map((item) => <button key={item.serial} className={device?.serial === item.serial ? 'active' : ''} onClick={() => setSelectedSerial(item.serial)}><span>{item.serial}</span><b className={`run-${item.status}`}>{statusText(item.status)}</b></button>)}</div>
       </section>
       <section className="page-card run-detail">
-        {device && <><div className="run-detail-head"><div><h3>{device.serial}</h3><p>{device.error || (device.status === 'running' ? device.stepIndex === undefined ? '正在启动任务' : `正在执行第 ${device.stepIndex + 1} 步` : statusText(device.status))}</p></div><div className="run-detail-actions">{isActive && (device.status === 'pending' || device.status === 'running') && <button onClick={() => onCancel(device.serial)}>取消此设备</button>}{device.runDir && <button onClick={() => onOpenResult(device.runDir!)}>打开结果目录</button>}</div></div>
+        {device && <><div className="run-detail-head"><div><h3>{device.serial}</h3><p>{device.error || (device.status === 'running' ? currentAction || '正在启动任务' : statusText(device.status))}</p></div><div className="run-detail-actions">{isActive && (device.status === 'pending' || device.status === 'running') && <button onClick={() => onCancel(device.serial)}>取消此设备</button>}{device.runDir && <button onClick={() => onOpenResult(device.runDir!)}>打开结果目录</button>}</div></div>
           <div className="run-event-list" role="log">{record.events.filter((event) => event.serial === device.serial).map((event, index) => <div key={`${event.at}-${index}`} className={`run-event run-${event.kind}`}><time>{new Date(event.at).toLocaleTimeString()}</time><span>{event.message}</span></div>)}{!record.events.some((event) => event.serial === device.serial) && <p>等待设备开始运行…</p>}</div>
         </>}
       </section>

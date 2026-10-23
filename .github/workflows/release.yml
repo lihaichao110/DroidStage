@@ -1,0 +1,137 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: 校验发布标签
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! "$GITHUB_REF_NAME" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo '标签必须采用 vX.Y.Z 格式' >&2
+            exit 1
+          fi
+          version="$(node -p "require('./package.json').version")"
+          if [[ "$GITHUB_REF_NAME" != "v$version" ]]; then
+            echo "标签 $GITHUB_REF_NAME 与 package.json 版本 $version 不一致" >&2
+            exit 1
+          fi
+          git fetch origin main:refs/remotes/origin/main
+          tag_commit="$(git rev-parse "${GITHUB_REF}^{commit}")"
+          if ! git merge-base --is-ancestor "$tag_commit" origin/main; then
+            echo '发布标签必须指向 main 历史中的提交' >&2
+            exit 1
+          fi
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+
+  android-agent:
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - run: sdkmanager 'platforms;android-35' 'build-tools;34.0.0'
+      - run: bash ./gradlew assembleDebug assembleDebugAndroidTest
+        working-directory: android
+      - run: npm run stage:agent
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-agent-apks
+          path: |
+            assets/agent/host.apk
+            assets/agent/test.apk
+          if-no-files-found: error
+
+  package:
+    needs: [validate, android-agent]
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            platform: win
+            script: dist:win
+          - os: macos-latest
+            platform: mac
+            script: dist:mac
+    runs-on: ${{ matrix.os }}
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - uses: actions/download-artifact@v4
+        with:
+          name: android-agent-apks
+          path: assets/agent
+      - run: npm run ${{ matrix.script }}
+      - run: node scripts/prepare-release.mjs ${{ matrix.platform }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installers-${{ matrix.platform }}
+          path: |
+            release/*.exe
+            release/*.dmg
+            release/*.zip
+          if-no-files-found: error
+
+  publish:
+    needs: package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: installers-*
+          merge-multiple: true
+          path: release-assets
+      - run: node scripts/prepare-release.mjs all release-assets
+      - name: 发布 GitHub Release
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            echo "Release $GITHUB_REF_NAME 已存在" >&2
+            exit 1
+          fi
+          gh release create "$GITHUB_REF_NAME" --draft --verify-tag --title "DroidStage $GITHUB_REF_NAME" --generate-notes
+          cleanup() { gh release delete "$GITHUB_REF_NAME" --yes || true; }
+          trap cleanup ERR
+          gh release upload "$GITHUB_REF_NAME" release-assets/*.exe release-assets/*.dmg release-assets/*.zip release-assets/SHA256SUMS.txt
+          gh release edit "$GITHUB_REF_NAME" --draft=false
+          trap - ERR

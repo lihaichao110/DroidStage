@@ -1,9 +1,13 @@
+/**
+ * 手机端自动化代理：通过本地 socket 执行控件查询、输入与设备操作。
+ */
 package dev.androidautodesk.host
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.BySelector
+import androidx.test.uiautomator.Configurator
 import androidx.test.uiautomator.UiDevice
 import org.json.JSONObject
 import org.junit.Test
@@ -19,6 +23,12 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 @RunWith(AndroidJUnit4::class)
 class AgentTest {
+    private companion object {
+        // 视频类 App 持续发出无障碍事件，等待长时间空闲会耗尽用户设置的控件查找超时。
+        const val UI_IDLE_WAIT_MS = 100L
+        const val COUNT_POLL_INTERVAL_MS = 100L // 短轮询只用于消除页面切换时控件树尚未刷新的瞬态空结果
+    }
+
     private val device by lazy { UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()) }
     // 触摸/滚轮注入独立于 UiDevice 高层 API，见 TouchInjector 注释
     private val injector by lazy { TouchInjector(InstrumentationRegistry.getInstrumentation().uiAutomation) }
@@ -27,6 +37,7 @@ class AgentTest {
 
     @Test
     fun serve() {
+        Configurator.getInstance().setWaitForIdleTimeout(UI_IDLE_WAIT_MS)
         val connections: ExecutorService = Executors.newCachedThreadPool()
         ServerSocket(39827, 4, InetAddress.getByName("127.0.0.1")).use { server ->
             server.soTimeout = 2000
@@ -77,7 +88,7 @@ class AgentTest {
                 device.dumpWindowHierarchy(out)
                 out.toString("UTF-8")
             }
-            "count" -> matches(selector(args.getJSONObject("selector"))).size
+            "count" -> countMatches(selector(args.getJSONObject("selector")), args.optLong("waitMs", 0L))
             "tap" -> {
                 if (args.has("selector") && !args.isNull("selector")) {
                     findUnique(selector(args.getJSONObject("selector")), args.optLong("timeoutMs", 10000)).click()
@@ -138,6 +149,23 @@ class AgentTest {
     }
 
     private fun matches(by: BySelector) = device.findObjects(by)
+
+    /**
+     * 查询控件数量；等待期内只重试空结果，发现匹配或超过期限后立即返回。
+     * @param by UI Automator 定位条件
+     * @param waitMs 空结果的最长等待时间，范围为 0–60000 毫秒
+     * @return 最终匹配数量
+     */
+    private fun countMatches(by: BySelector, waitMs: Long): Int {
+        if (waitMs !in 0L..60000L) error("控件查询等待时间无效")
+        val deadline = System.currentTimeMillis() + waitMs
+        while (true) {
+            val count = matches(by).size
+            val now = System.currentTimeMillis()
+            if (count != 0 || now >= deadline) return count
+            Thread.sleep(minOf(COUNT_POLL_INTERVAL_MS, deadline - now))
+        }
+    }
 
     private fun findUnique(by: BySelector, timeoutMs: Long): androidx.test.uiautomator.UiObject2 {
         val deadline = System.currentTimeMillis() + timeoutMs

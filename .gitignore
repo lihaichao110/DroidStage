@@ -5,8 +5,5 @@ android/.gradle/
 android/local.properties
 android/app/build/
 assets/agent/*.apk
-assets/adb/win32/
-assets/adb/darwin-x64/
-assets/adb/darwin-arm64/
 *.log
 .zcode

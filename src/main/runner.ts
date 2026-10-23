@@ -6,8 +6,10 @@ import { randomUUID } from 'node:crypto'
 import { appendFile, mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import type { AutomationTask, BasicStep, ConditionStep, RunEvent } from '../shared/types'
-import { stepTypeName, validateTask } from '../shared/task'
+import { flowStepNumber, stepSummary, validateTask } from '../shared/task'
 import { DeviceSession } from './session'
+
+const CONDITION_ONCE_WAIT_MS = 2000 // 判断一次时给动态页面留出控件树刷新时间，避免启动后立即误判不存在
 
 export class TaskRunner {
   private cancelled = false
@@ -33,7 +35,7 @@ export class TaskRunner {
       await writeFile(path.join(runDir, 'task.json'), JSON.stringify(task, null, 2), 'utf8')
       // 包名可选：留空时跳过启动，步骤直接作用于手机当前界面——控件定位只依赖 selector 属性，与包名无关
       if (task.packageName) {
-        await event('start', `启动 ${task.packageName}`)
+        await event('start', `第 1 步：打开应用 · 应用包名：${task.packageName}`)
         await session.launch(task.packageName)
       } else {
         await event('start', '未指定目标 App，直接在当前界面执行')
@@ -41,18 +43,19 @@ export class TaskRunner {
       for (let index = 0; index < task.steps.length; index++) {
         if (this.cancelled) throw new CancelledError()
         const step = task.steps[index]
-        await event('step', `第 ${index + 1} 步：${stepTypeName(step.type)}`, index)
+        const number = flowStepNumber(index, task.packageName)
+        await event('step', `第 ${number} 步：${stepSummary(step)}`, index)
         try {
           if (step.type === 'condition') {
-            await this.executeCondition(step, session, runDir, index, event)
+            await this.executeCondition(step, session, runDir, index, number, event)
           } else {
             await this.executeBasicStep(step, session, runDir, `step-${String(index + 1).padStart(3, '0')}`)
           }
         } catch (error) {
           if (error instanceof CancelledError) throw error
           failedIndex = index
-          // 失败消息带上步骤序号与动作类型，否则手机端只回传“未找到控件”这类裸错误，用户无法分辨是哪一步出错
-          throw new Error(`第 ${index + 1} 步（${stepTypeName(step.type)}）失败：${error instanceof Error ? error.message : String(error)}`)
+          // 流程卡包含自动启动应用，失败编号与目标必须按用户看到的流程呈现。
+          throw new Error(`第 ${number} 步（${stepSummary(step)}）失败：${error instanceof Error ? error.message : String(error)}`)
         }
       }
       if (this.cancelled) throw new CancelledError()
@@ -76,47 +79,50 @@ export class TaskRunner {
     session: DeviceSession,
     runDir: string,
     index: number,
+    number: number,
     event: (kind: RunEvent['kind'], message: string, stepIndex?: number) => Promise<void>
   ): Promise<void> {
     const maxChecks = step.mode === 'once' ? 1 : step.maxChecks
     for (let check = 1; check <= maxChecks; check++) {
       this.throwIfCancelled()
-      const count = await session.count(step.selector)
+      const waitMs = step.mode === 'once' ? CONDITION_ONCE_WAIT_MS : 0
+      const count = await session.count(step.selector, waitMs)
       this.throwIfCancelled()
-      await event('step', `第 ${index + 1} 步：第 ${check}/${maxChecks} 次检查，匹配 ${count} 个控件`, index)
+      const waitDetail = waitMs > 0 ? `（最多等待 ${waitMs / 1000} 秒）` : ''
+      await event('step', `第 ${number} 步：${stepSummary(step)} · 第 ${check}/${maxChecks} 次检查${waitDetail}，匹配 ${count} 个控件`, index)
       if (!Number.isInteger(count) || count < 0) throw new Error('控件匹配数量无效')
       if (count > 1) throw new Error(`定位条件匹配 ${count} 个控件，需要恰好 1 个`)
       if (count === 1) {
-        await this.executeBranch(step.whenPresent, '存在时', session, runDir, index, check, event)
+        await this.executeBranch(step.whenPresent, '存在时', session, runDir, index, number, check, event)
         return
       }
       if (step.mode === 'once') {
-        await this.executeBranch(step.whenAbsent, '不存在时', session, runDir, index, check, event)
+        await this.executeBranch(step.whenAbsent, '不存在时', session, runDir, index, number, check, event)
         return
       }
       if (check === maxChecks) throw new Error(`连续检查 ${maxChecks} 次仍未找到控件：${step.selector.value}`)
-      await this.executeBranch(step.whenAbsent, '不存在时', session, runDir, index, check, event)
+      await this.executeBranch(step.whenAbsent, '不存在时', session, runDir, index, number, check, event)
       await this.waitRetry(step.intervalMs)
     }
   }
 
   /** 分支动作沿用普通动作执行规则，并把分支位置写进日志与失败信息。 */
   private async executeBranch(
-    actions: BasicStep[], label: string, session: DeviceSession, runDir: string, index: number, check: number,
+    actions: BasicStep[], label: string, session: DeviceSession, runDir: string, index: number, number: number, check: number,
     event: (kind: RunEvent['kind'], message: string, stepIndex?: number) => Promise<void>
   ): Promise<void> {
-    await event('step', `第 ${index + 1} 步：执行「${label}」分支（${actions.length} 个动作）`, index)
+    await event('step', `第 ${number} 步：执行「${label}」分支（${actions.length} 个动作）`, index)
     for (let childIndex = 0; childIndex < actions.length; childIndex++) {
       this.throwIfCancelled()
       const action = actions[childIndex]
-      await event('step', `第 ${index + 1} 步「${label}」第 ${childIndex + 1} 个动作：${stepTypeName(action.type)}`, index)
+      await event('step', `第 ${number} 步「${label}」第 ${childIndex + 1} 个动作：${stepSummary(action)}`, index)
       try {
         // 轮次和分支写入文件名，重复查找中的截图不会覆盖前一轮。
         const screenshotName = `step-${String(index + 1).padStart(3, '0')}-${label === '存在时' ? 'present' : 'absent'}-${String(check).padStart(3, '0')}-${String(childIndex + 1).padStart(3, '0')}`
         await this.executeBasicStep(action, session, runDir, screenshotName)
       } catch (error) {
         if (error instanceof CancelledError) throw error
-        throw new Error(`「${label}」分支第 ${childIndex + 1} 个动作（${stepTypeName(action.type)}）失败：${error instanceof Error ? error.message : String(error)}`)
+        throw new Error(`「${label}」分支第 ${childIndex + 1} 个动作（${stepSummary(action)}）失败：${error instanceof Error ? error.message : String(error)}`)
       }
     }
   }
