@@ -10,6 +10,7 @@ type TaskActionsState = {
   setTask: Dispatch<SetStateAction<AutomationTask>>
   setEditingId: Dispatch<SetStateAction<string | null>>
   setMessage: (message: string) => void
+  onTaskLoaded: () => void
   targets: string[]
   onBatchStarted: (batch: BatchRecord) => void
 }
@@ -19,7 +20,7 @@ type TaskActionsState = {
  * @param state 当前任务及状态更新函数
  * @returns 保存、载入、运行与组合操作
  */
-export function useTaskActions({ task, setTask, setEditingId, setMessage, targets, onBatchStarted }: TaskActionsState) {
+export function useTaskActions({ task, setTask, setEditingId, setMessage, onTaskLoaded, targets, onBatchStarted }: TaskActionsState) {
   /** 保存任务，并在校验失败时显示错误。 */
   async function save(): Promise<void> {
     try {
@@ -33,7 +34,7 @@ export function useTaskActions({ task, setTask, setEditingId, setMessage, target
   async function load(): Promise<void> {
     try {
       const result = await window.androidAutoDesk.loadTask()
-      if (result) { setTask(result); setEditingId(null); setMessage('任务已载入。') }
+      if (result) { setTask(result); setEditingId(null); onTaskLoaded(); setMessage('任务已载入。') }
     } catch (error) { setMessage(errorText(error)) }
   }
 

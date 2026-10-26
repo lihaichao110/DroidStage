@@ -10,6 +10,7 @@ import type { BasicStep, ConditionStep, Selector } from '../../../shared/types'
  */
 export function useConditionDraft() {
   const [mode, setMode] = useState<'once' | 'repeatUntilPresent'>('once')
+  const [repeatCount, setRepeatCount] = useState(1)
   const [maxChecks, setMaxChecks] = useState(20)
   const [intervalMs, setIntervalMs] = useState(1000)
   const [whenPresent, setWhenPresent] = useState<BasicStep[]>([])
@@ -17,6 +18,7 @@ export function useConditionDraft() {
 
   function reset(): void {
     setMode('once')
+    setRepeatCount(1)
     setMaxChecks(20)
     setIntervalMs(1000)
     setWhenPresent([])
@@ -25,6 +27,7 @@ export function useConditionDraft() {
 
   function load(step: ConditionStep): void {
     setMode(step.mode)
+    setRepeatCount(step.repeatCount ?? 1)
     setWhenPresent(step.whenPresent)
     setWhenAbsent(step.whenAbsent)
     if (step.mode === 'repeatUntilPresent') { setMaxChecks(step.maxChecks); setIntervalMs(step.intervalMs) }
@@ -32,9 +35,9 @@ export function useConditionDraft() {
 
   function build(id: string, selector: Selector): ConditionStep {
     return mode === 'once'
-      ? { id, type: 'condition', selector, mode, whenPresent, whenAbsent }
-      : { id, type: 'condition', selector, mode, maxChecks, intervalMs, whenPresent, whenAbsent }
+      ? { id, type: 'condition', selector, mode, repeatCount, whenPresent, whenAbsent }
+      : { id, type: 'condition', selector, mode, repeatCount, maxChecks, intervalMs, whenPresent, whenAbsent }
   }
 
-  return { mode, setMode, maxChecks, setMaxChecks, intervalMs, setIntervalMs, whenPresent, setWhenPresent, whenAbsent, setWhenAbsent, reset, load, build }
+  return { mode, setMode, repeatCount, setRepeatCount, maxChecks, setMaxChecks, intervalMs, setIntervalMs, whenPresent, setWhenPresent, whenAbsent, setWhenAbsent, reset, load, build }
 }

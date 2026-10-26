@@ -26,7 +26,7 @@ const STEP_META: Record<Step['type'], { icon: string; help: string }> = {
 }
 
 /**
- * 用可编辑的流程卡片承载真实任务步骤，避免给用户展示尚未支持的循环能力。
+ * 用可编辑的流程卡片承载真实任务步骤，并展示条件步骤的重复次数。
  * @param props 任务状态与操作回调
  * @returns 任务流程及运行记录
  */
@@ -58,6 +58,7 @@ export function WorkflowPanel({ task, activeStepId, isRunning, onTaskChange, onN
             <div className={`flow-card${activeStepId === step.id ? ' selected' : ''}`}>
               <span className="flow-icon">{meta.icon}</span>
               <div className="flow-copy"><strong>{stepTitle(step.type)}</strong><small>{meta.help}</small><div className="flow-detail"><span>步骤目标</span><b>{stepDetail(step)}</b></div>
+                {step.type === 'condition' && (step.repeatCount ?? 1) > 1 && <small>重复执行 {step.repeatCount} 次</small>}
                 {step.type === 'condition' && <div className="flow-branches">
                   <span>存在时：{branchDetail(step.whenPresent)}</span>
                   <span>不存在时：{branchDetail(step.whenAbsent)}{step.mode === 'repeatUntilPresent' ? '，然后重新检查' : ''}</span>

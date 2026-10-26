@@ -100,6 +100,70 @@ const condition = {
 }
 
 describe('条件判断执行', () => {
+  it('外层重复每轮重新判断并执行对应分支，完成后才进入下一步', async () => {
+    const order: string[] = []
+    const count = vi.fn().mockResolvedValueOnce(0).mockResolvedValueOnce(1).mockResolvedValueOnce(0)
+    const request = vi.fn(async (op: string) => { order.push(op) })
+    const session = {
+      launch: vi.fn(async () => { order.push('launch') }), count, agent: () => ({ request })
+    } as unknown as DeviceSession
+    const events: RunEvent[] = []
+    await new TaskRunner().run({ version: 1, name: '重复', packageName: 'com.example.app', steps: [
+      { ...condition, repeatCount: 3 }, { id: 'after', type: 'key', key: 'home' }
+    ] }, session, (event) => events.push(event))
+    expect(order).toEqual(['launch', 'swipe', 'tap', 'swipe', 'key'])
+    expect(count).toHaveBeenCalledTimes(3)
+    expect(events.filter((event) => event.message.includes('次执行') && event.message.includes('第 1/1 次检查')).map((event) => event.message))
+      .toEqual(expect.arrayContaining([expect.stringContaining('第 1/3 次执行'), expect.stringContaining('第 2/3 次执行'), expect.stringContaining('第 3/3 次执行')]))
+    expect(events.at(-1)?.kind).toBe('success')
+  })
+
+  it('每轮独立执行内部重复查找，分支截图不会覆盖其他轮次', async () => {
+    const count = vi.fn().mockResolvedValueOnce(0).mockResolvedValueOnce(1).mockResolvedValueOnce(0).mockResolvedValueOnce(1)
+    const session = {
+      count, agent: () => ({ request: vi.fn(async () => 'ok') }), screenshot: vi.fn(async () => Buffer.from('fake png'))
+    } as unknown as DeviceSession
+    const events: RunEvent[] = []
+    await new TaskRunner().run({ version: 1, name: '两层重复', steps: [{
+      ...condition, mode: 'repeatUntilPresent', repeatCount: 2, maxChecks: 2, intervalMs: 100,
+      whenAbsent: [{ id: 'capture-absent', type: 'screenshot' }],
+      whenPresent: [{ id: 'capture-present', type: 'screenshot' }]
+    }] }, session, (event) => events.push(event))
+    expect(count).toHaveBeenCalledTimes(4)
+    for (const round of ['001', '002']) {
+      expect((await stat(path.join(events[0].runDir!, `step-001-run-${round}-absent-001-001.png`))).size).toBe(8)
+      expect((await stat(path.join(events[0].runDir!, `step-001-run-${round}-present-002-001.png`))).size).toBe(8)
+    }
+    expect(events.filter((event) => event.message.includes('第 2/2 次检查'))).toHaveLength(2)
+  })
+
+  it('外层某轮失败时注明轮次并停止后续轮次和步骤', async () => {
+    const request = vi.fn().mockResolvedValueOnce('ok').mockRejectedValueOnce(new Error('点击失败'))
+    const count = vi.fn(async () => 1)
+    const session = {
+      count, agent: () => ({ request }), screenshot: vi.fn(async () => Buffer.from('fake png'))
+    } as unknown as DeviceSession
+    const events: RunEvent[] = []
+    await expect(new TaskRunner().run({ version: 1, name: '失败', steps: [
+      { ...condition, repeatCount: 3 }, { id: 'after', type: 'key', key: 'home' }
+    ] }, session, (event) => events.push(event))).rejects.toThrow('第 2/3 次执行失败')
+    expect(request).toHaveBeenCalledTimes(2)
+    expect(count).toHaveBeenCalledTimes(2)
+    expect(events.at(-1)).toMatchObject({ kind: 'failure', stepIndex: 0 })
+  })
+
+  it('取消后不会开始下一轮条件判断', async () => {
+    const runner = new TaskRunner()
+    const request = vi.fn(async () => { runner.cancel() })
+    const count = vi.fn(async () => 1)
+    const session = { count, agent: () => ({ request }) } as unknown as DeviceSession
+    const events: RunEvent[] = []
+    await runner.run({ version: 1, name: '取消', steps: [{ ...condition, repeatCount: 3 }] }, session, (event) => events.push(event))
+    expect(count).toHaveBeenCalledTimes(1)
+    expect(request).toHaveBeenCalledTimes(1)
+    expect(events.at(-1)?.kind).toBe('cancelled')
+  })
+
   it.each([
     { count: 1, expected: 'tap' },
     { count: 0, expected: 'swipe' }

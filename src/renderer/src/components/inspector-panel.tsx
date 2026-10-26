@@ -13,6 +13,7 @@ type InspectorPanelProps = {
   isConnected: boolean
   isBusy: boolean
   isTaskRunning: boolean
+  isSubmitting: boolean
   onRefresh: () => void
   onSelect: (node: UiNode | null, point: Point | null) => void
   onHoverNode: (node: UiNode | null) => void
@@ -23,10 +24,10 @@ type InspectorPanelProps = {
  * @param props 投屏状态及拾取回调
  * @returns 设备预览面板
  */
-export function InspectorPanel({ serial, snapshot, selectedNode, hoverNode, isConnected, isBusy, isTaskRunning, onRefresh, onSelect, onHoverNode }: InspectorPanelProps) {
+export function InspectorPanel({ serial, snapshot, selectedNode, hoverNode, isConnected, isBusy, isTaskRunning, isSubmitting, onRefresh, onSelect, onHoverNode }: InspectorPanelProps) {
   const [mode, setMode] = useState<MirrorMode>('control')
 
-  return <section className="panel device-panel">
+  return <section className="panel device-panel" inert={isSubmitting}>
     <div className="panel-head device-head">
       <h2>设备预览</h2>
       <button className="icon-action" title="刷新控件层级" aria-label="刷新控件层级" onClick={onRefresh} disabled={!isConnected || isBusy || isTaskRunning}>↻</button>

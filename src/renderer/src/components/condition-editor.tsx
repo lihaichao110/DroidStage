@@ -10,6 +10,8 @@ type ConditionEditorProps = {
   onSelectorChange: (selector: Selector | null) => void
   mode: 'once' | 'repeatUntilPresent'
   onModeChange: (mode: 'once' | 'repeatUntilPresent') => void
+  repeatCount: number
+  onRepeatCountChange: (count: number) => void
   maxChecks: number
   onMaxChecksChange: (count: number) => void
   intervalMs: number
@@ -27,7 +29,7 @@ type ConditionEditorProps = {
  * @returns 条件设置与两个分支编辑器
  */
 export function ConditionEditor(props: ConditionEditorProps) {
-  const { selector, mode, maxChecks, intervalMs, whenPresent, whenAbsent } = props
+  const { selector, mode, repeatCount, maxChecks, intervalMs, whenPresent, whenAbsent } = props
   const selectorKind = selector?.kind ?? 'text'
   const [editing, setEditing] = useState({ present: false, absent: false })
   useEffect(() => {
@@ -43,6 +45,8 @@ export function ConditionEditor(props: ConditionEditorProps) {
       </select></label>
       <label className="setting-field">定位值<input placeholder="例如：关注" value={selector?.value ?? ''} onChange={(event) => props.onSelectorChange({ kind: selectorKind, value: event.target.value })} /></label>
     </div>
+    <label className="setting-field">重复执行次数<input type="number" min="1" max="100" step="1" value={repeatCount} onChange={(event) => props.onRepeatCountChange(Number(event.target.value))} /></label>
+    <p className="condition-hint">每次都会重新判断并执行对应分支；“最多检查次数”按每次执行分别计算。</p>
     <label className="setting-field">判断模式<select value={mode} onChange={(event) => props.onModeChange(event.target.value as ConditionEditorProps['mode'])}>
       <option value="once">判断一次，执行对应分支后继续</option>
       <option value="repeatUntilPresent">未找到时执行分支并重新检查</option>

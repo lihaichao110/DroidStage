@@ -5,8 +5,6 @@ package dev.androidautodesk.host
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import androidx.test.uiautomator.By
-import androidx.test.uiautomator.BySelector
 import androidx.test.uiautomator.Configurator
 import androidx.test.uiautomator.UiDevice
 import org.json.JSONObject
@@ -30,6 +28,8 @@ class AgentTest {
     }
 
     private val device by lazy { UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()) }
+    private val locator by lazy { ElementLocator(device) }
+    private val lists by lazy { ListOperations(device, locator) }
     // 触摸/滚轮注入独立于 UiDevice 高层 API，见 TouchInjector 注释
     private val injector by lazy { TouchInjector(InstrumentationRegistry.getInstrumentation().uiAutomation) }
     private val token by lazy { InstrumentationRegistry.getArguments().getString("token") ?: error("缺少会话密钥") }
@@ -88,10 +88,14 @@ class AgentTest {
                 device.dumpWindowHierarchy(out)
                 out.toString("UTF-8")
             }
-            "count" -> countMatches(selector(args.getJSONObject("selector")), args.optLong("waitMs", 0L))
+            "count" -> countMatches(args.getJSONObject("selector"), args.optLong("waitMs", 0L))
+            "inspectMatches" -> locator.inspect(args.getJSONObject("selector"))
+            "scanRows" -> lists.scan(args)
+            "tapRow" -> lists.tap(args)
+            "scrollList" -> lists.scroll(args)
             "tap" -> {
                 if (args.has("selector") && !args.isNull("selector")) {
-                    findUnique(selector(args.getJSONObject("selector")), args.optLong("timeoutMs", 10000)).click()
+                    locator.findUnique(args.getJSONObject("selector"), args.optLong("timeoutMs", 10000)).click()
                 } else {
                     val point = args.getJSONObject("point")
                     if (!device.click(point.getInt("x"), point.getInt("y"))) error("坐标点击失败")
@@ -99,7 +103,7 @@ class AgentTest {
                 "ok"
             }
             "input" -> {
-                val target = findUnique(selector(args.getJSONObject("selector")), args.optLong("timeoutMs", 10000))
+                val target = locator.findUnique(args.getJSONObject("selector"), args.optLong("timeoutMs", 10000))
                 target.setText(args.getString("text"))
                 "ok"
             }
@@ -111,11 +115,11 @@ class AgentTest {
                 "ok"
             }
             "wait" -> {
-                val by = selector(args.getJSONObject("selector"))
+                val selector = args.getJSONObject("selector")
                 val wantExists = args.getBoolean("exists")
                 val deadline = System.currentTimeMillis() + args.getLong("timeoutMs")
                 while (true) {
-                    val count = matches(by).size
+                    val count = locator.count(selector)
                     if (count > 1) error("定位条件匹配多个控件")
                     if ((count == 1) == wantExists) break
                     if (System.currentTimeMillis() >= deadline) error("等待控件超时")
@@ -136,45 +140,21 @@ class AgentTest {
         }
     }
 
-    private fun selector(json: JSONObject): BySelector {
-        val value = json.getString("value")
-        if (value.isBlank()) error("定位值不能为空")
-        return when (json.getString("kind")) {
-            "resourceId" -> By.res(value)
-            "description" -> By.desc(value)
-            "text" -> By.text(value)
-            "className" -> By.clazz(value)
-            else -> error("未知定位方式")
-        }
-    }
-
-    private fun matches(by: BySelector) = device.findObjects(by)
-
     /**
      * 查询控件数量；等待期内只重试空结果，发现匹配或超过期限后立即返回。
-     * @param by UI Automator 定位条件
+     * @param selector 任务定位条件
      * @param waitMs 空结果的最长等待时间，范围为 0–60000 毫秒
      * @return 最终匹配数量
      */
-    private fun countMatches(by: BySelector, waitMs: Long): Int {
+    private fun countMatches(selector: JSONObject, waitMs: Long): Int {
         if (waitMs !in 0L..60000L) error("控件查询等待时间无效")
         val deadline = System.currentTimeMillis() + waitMs
         while (true) {
-            val count = matches(by).size
+            val count = locator.count(selector)
             val now = System.currentTimeMillis()
             if (count != 0 || now >= deadline) return count
             Thread.sleep(minOf(COUNT_POLL_INTERVAL_MS, deadline - now))
         }
     }
 
-    private fun findUnique(by: BySelector, timeoutMs: Long): androidx.test.uiautomator.UiObject2 {
-        val deadline = System.currentTimeMillis() + timeoutMs
-        while (true) {
-            val found = matches(by)
-            if (found.size > 1) error("定位条件匹配多个控件")
-            if (found.size == 1) return found[0]
-            if (System.currentTimeMillis() >= deadline) error("未找到控件")
-            Thread.sleep(200)
-        }
-    }
 }

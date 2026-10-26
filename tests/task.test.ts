@@ -50,6 +50,17 @@ describe('任务格式', () => {
     expect(() => validateTask(JSON.parse(JSON.stringify(task)))).not.toThrow()
   })
 
+  it('条件步骤的重复执行次数可省略，填写时须为 1–100 的整数', () => {
+    const base = { id: 'condition', type: 'condition', selector: { kind: 'text', value: '关注' }, mode: 'once', whenPresent: [], whenAbsent: [] }
+    const wrap = (step: unknown) => ({ version: 1, name: '重复校验', steps: [step] })
+    for (const count of [undefined, 1, 10, 100]) {
+      expect(() => validateTask(wrap({ ...base, repeatCount: count }))).not.toThrow()
+    }
+    for (const count of [0, -1, 101, 1.5, '10', '', null, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(() => validateTask(wrap({ ...base, repeatCount: count }))).toThrow('重复执行次数必须为 1–100 次')
+    }
+  })
+
   it('条件参数、嵌套、重复 ID 和累计 500 步上限均受校验', () => {
     const base = { id: 'condition', type: 'condition', selector: { kind: 'text', value: '关注' }, mode: 'repeatUntilPresent', maxChecks: 20, intervalMs: 1000, whenPresent: [], whenAbsent: [] }
     const wrap = (step: unknown) => ({ version: 1, name: '测试', steps: [step] })

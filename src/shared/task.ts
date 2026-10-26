@@ -12,6 +12,9 @@ export function validateSelector(value: unknown): asserts value is Selector {
   if (!selectorKinds.has(String(selector.kind)) || typeof selector.value !== 'string' || !selector.value.trim()) {
     throw new Error('控件定位条件无效')
   }
+  if (selector.matchIndex !== undefined && (!Number.isInteger(selector.matchIndex) || Number(selector.matchIndex) < 1 || Number(selector.matchIndex) > 10000)) {
+    throw new Error('匹配序号必须为 1–10000')
+  }
 }
 
 export function validateTask(value: unknown): asserts value is AutomationTask {
@@ -37,8 +40,18 @@ export function validateTask(value: unknown): asserts value is AutomationTask {
   for (const raw of task.steps) {
     registerStep(raw)
     const step = raw as Step
-    if (step.type === 'condition') {
+    if (step.type === 'listClick') {
+      for (const field of ['container', 'row', 'name', 'identity', 'action', 'completed'] as const) validateSelector(step[field])
+      for (const field of ['row', 'name', 'identity', 'action', 'completed'] as const) {
+        if (step[field].matchIndex !== undefined) throw new Error('列表行内定位不能使用全屏匹配序号')
+      }
+      if (!Number.isInteger(step.maxScrolls) || step.maxScrolls < 1 || step.maxScrolls > 1000) throw new Error('最多滚动次数必须为 1–1000')
+      validateTimeout(step.timeoutMs)
+    } else if (step.type === 'condition') {
       validateSelector(step.selector)
+      if (step.repeatCount !== undefined && (!Number.isInteger(step.repeatCount) || step.repeatCount < 1 || step.repeatCount > 100)) {
+        throw new Error('重复执行次数必须为 1–100 次')
+      }
       if (step.mode !== 'once' && step.mode !== 'repeatUntilPresent') throw new Error('条件判断模式无效')
       if (!Array.isArray(step.whenPresent) || !Array.isArray(step.whenAbsent)) throw new Error('条件分支无效')
       if (step.mode === 'repeatUntilPresent') {
@@ -49,7 +62,7 @@ export function validateTask(value: unknown): asserts value is AutomationTask {
         for (const child of branch) {
           registerStep(child)
           const branchStep = child as Step
-          if (branchStep.type === 'condition') throw new Error('条件分支暂不支持嵌套条件判断')
+          if (branchStep.type === 'condition' || branchStep.type === 'listClick') throw new Error('条件分支暂不支持嵌套步骤')
           validateBasicStep(branchStep)
         }
       }
@@ -109,7 +122,7 @@ function validateTimeout(timeoutMs: number): void {
 
 const stepTitles: Record<Step['type'], string> = {
   tap: '点击控件', input: '输入文本', swipe: '滑动屏幕', wait: '等待控件', assert: '断言控件',
-  condition: '条件判断', screenshot: '保存截图', key: '按下按键'
+  condition: '条件判断', listClick: '遍历列表并点击', screenshot: '保存截图', key: '按下按键'
 }
 
 const selectorNames: Record<Selector['kind'], string> = {
@@ -124,6 +137,7 @@ export const stepTypeOptions: { value: Step['type']; label: string }[] = [
   { value: 'wait', label: stepTitles.wait },
   { value: 'assert', label: stepTitles.assert },
   { value: 'condition', label: stepTitles.condition },
+  { value: 'listClick', label: stepTitles.listClick },
   { value: 'screenshot', label: stepTitles.screenshot },
   { value: 'key', label: stepTitles.key }
 ]
@@ -133,7 +147,7 @@ export function stepTitle(type: Step['type']): string { return stepTitles[type] 
 
 /** 返回任务流程卡与运行记录共用的目标摘要。 */
 export function stepDetail(step: Step): string {
-  const target = (selector: Selector): string => `${selectorNames[selector.kind]}：${selector.value}`
+  const target = (selector: Selector): string => `${selectorNames[selector.kind]}：${selector.value}${selector.matchIndex ? ` · 第 ${selector.matchIndex} 个` : ''}`
   switch (step.type) {
     case 'tap': return step.selector ? target(step.selector) : `坐标 (${step.point?.x}, ${step.point?.y})`
     case 'input': return `${target(step.selector)} · ${step.text.length} 字`
@@ -141,6 +155,7 @@ export function stepDetail(step: Step): string {
     case 'wait': return `${target(step.selector)} · ${step.exists ? '出现' : '消失'}`
     case 'assert': return `${target(step.selector)} · ${step.exists ? '存在' : '不存在'}`
     case 'condition': return `${target(step.selector)} · ${step.mode === 'once' ? '判断一次' : `最多检查 ${step.maxChecks} 次`}`
+    case 'listClick': return `行：${target(step.row)} · 点击：${target(step.action)} · 最多滚动 ${step.maxScrolls} 次`
     case 'screenshot': return '当前设备画面'
     case 'key': return step.key === 'back' ? '返回' : 'Home'
   }
@@ -175,11 +190,25 @@ export function suggestedSelector(node: UiNode, nodes: readonly UiNode[]): Selec
   if (node.clickable && node.description.trim() && nodes.filter((candidate) => candidate.description === node.description).length === 1) {
     return { kind: 'description', value: node.description }
   }
-  if (node.resourceId) return { kind: 'resourceId', value: node.resourceId }
-  if (node.description) return { kind: 'description', value: node.description }
-  if (node.text) return { kind: 'text', value: node.text }
-  if (node.className) return { kind: 'className', value: node.className }
+  for (const [kind, value] of [['resourceId', node.resourceId], ['description', node.description], ['text', node.text], ['className', node.className]] as const) {
+    if (!value) continue
+    const matches = sortedMatches(nodes.filter((candidate) => candidate[kind] === value))
+    const index = matches.findIndex((candidate) => candidate.id === node.id)
+    if (index < 0) continue
+    return { kind, value, ...(matches.length > 1 ? { matchIndex: index + 1 } : {}) }
+  }
   return null
+}
+
+/** 按屏幕几何顺序排序；完全相同的边界无法可靠指定序号。 */
+export function sortedMatches<T extends { bounds: Bounds }>(nodes: readonly T[]): T[] {
+  return [...nodes].sort((a, b) => a.bounds.top - b.bounds.top || a.bounds.left - b.bounds.left || a.bounds.bottom - b.bounds.bottom || a.bounds.right - b.bounds.right)
+}
+
+/** 判断指定序号是否存在且有可区分的屏幕位置。 */
+export function indexedMatchIsDistinct(bounds: readonly Bounds[], index: number): boolean {
+  const target = bounds[index - 1]
+  return Boolean(target && !bounds.some((other, position) => position !== index - 1 && other.top === target.top && other.left === target.left && other.right === target.right && other.bottom === target.bottom))
 }
 
 export function findNodeAt(nodes: UiNode[], x: number, y: number): UiNode | null {

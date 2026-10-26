@@ -1,7 +1,7 @@
 /**
  * 主进程与渲染进程共用的任务、设备、事件和 IPC 类型。
  */
-export type Selector = { kind: 'resourceId' | 'description' | 'text' | 'className'; value: string }
+export type Selector = { kind: 'resourceId' | 'description' | 'text' | 'className'; value: string; matchIndex?: number }
 export type Point = { x: number; y: number }
 export type Bounds = { left: number; top: number; right: number; bottom: number }
 
@@ -18,6 +18,8 @@ export type ConditionStep = {
   id: string
   type: 'condition'
   selector: Selector
+  /** 整个条件步骤的执行次数；旧任务缺省时按 1 次处理。 */
+  repeatCount?: number
   whenPresent: BasicStep[]
   whenAbsent: BasicStep[]
 } & (
@@ -25,7 +27,21 @@ export type ConditionStep = {
   | { mode: 'repeatUntilPresent'; maxChecks: number; intervalMs: number }
 )
 
-export type Step = BasicStep | ConditionStep
+/** 在同一个滚动容器中逐行执行动作，行内字段均相对于用户行查找。 */
+export type ListClickStep = {
+  id: string
+  type: 'listClick'
+  container: Selector
+  row: Selector
+  name: Selector
+  identity: Selector
+  action: Selector
+  completed: Selector
+  maxScrolls: number
+  timeoutMs: number
+}
+
+export type Step = BasicStep | ConditionStep | ListClickStep
 
 export type AutomationTask = {
   version: 1
@@ -46,6 +62,7 @@ export type UiNode = {
   className: string
   packageName: string
   clickable: boolean
+  scrollable: boolean
   bounds: Bounds
 }
 
@@ -72,7 +89,7 @@ export type MirrorStatus =
   | { state: 'error'; message: string }
 
 export type RunEvent = {
-  kind: 'start' | 'step' | 'success' | 'failure' | 'cancelled'
+  kind: 'start' | 'step' | 'warning' | 'success' | 'partial' | 'failure' | 'cancelled'
   at: string
   stepIndex?: number
   message: string
@@ -84,7 +101,9 @@ export type RunEvent = {
 /** 主进程持有的逐设备连接态，供页面重载后恢复。 */
 export type SessionState = { serial: string; connected: boolean }
 
-export type DeviceRunStatus = 'pending' | 'running' | 'success' | 'failure' | 'cancelled'
+export type DeviceRunStatus = 'pending' | 'running' | 'success' | 'partial' | 'failure' | 'cancelled'
+export type ListRow = { name: string; key: string; hasAction: boolean; hasCompleted: boolean; error?: string }
+export type MatchInfo = { bounds: Bounds; index: number }
 export type DeviceRun = { serial: string; status: DeviceRunStatus; stepIndex?: number; error?: string; runDir?: string }
 export type BatchRecord = {
   id: string
@@ -105,6 +124,7 @@ export type AppApi = {
   sessionStates(): Promise<SessionState[]>
   snapshot(serial: string): Promise<HierarchySnapshot>
   count(serial: string, selector: Selector): Promise<number>
+  inspectMatches(serial: string, selector: Selector): Promise<MatchInfo[]>
   saveTask(task: AutomationTask): Promise<string | null>
   loadTask(): Promise<AutomationTask | null>
   runTask(task: AutomationTask, serials: string[]): Promise<BatchRecord>
