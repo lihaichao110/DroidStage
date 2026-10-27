@@ -194,7 +194,7 @@ export function suggestedSelector(node: UiNode, nodes: readonly UiNode[]): Selec
     if (!value) continue
     const matches = sortedMatches(nodes.filter((candidate) => candidate[kind] === value))
     const index = matches.findIndex((candidate) => candidate.id === node.id)
-    if (index < 0) continue
+    if (index < 0 || !indexedMatchIsDistinct(matches.map((candidate) => candidate.bounds), index + 1)) continue
     return { kind, value, ...(matches.length > 1 ? { matchIndex: index + 1 } : {}) }
   }
   return null

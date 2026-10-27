@@ -27,6 +27,27 @@ const task: AutomationTask = {
 }
 
 describe('任务执行器', () => {
+  it('列表单人失败时继续运行，并以部分完成及人数汇总结束', async () => {
+    const list: AutomationTask['steps'][number] = {
+      id: 'list', type: 'listClick', container: { kind: 'text', value: '列表' }, row: { kind: 'text', value: '用户行' },
+      name: { kind: 'text', value: '昵称' }, identity: { kind: 'text', value: '账号' },
+      action: { kind: 'text', value: '关注' }, completed: { kind: 'text', value: '已关注' },
+      maxScrolls: 1, timeoutMs: 1000
+    }
+    const request = vi.fn(async (op: string, args: Record<string, unknown>) => {
+      if (op === 'scanRows') return ['甲', '乙'].map((name) => ({ name, key: name, hasAction: true, hasCompleted: false }))
+      if (op === 'tapRow') return args.key === '甲' ? { ok: false, reason: '状态未变化' } : { ok: true }
+      if (op === 'scrollList') return false
+      throw new Error(`未知操作：${op}`)
+    })
+    const session = { agent: () => ({ request }) } as unknown as DeviceSession
+    const events: RunEvent[] = []
+    await new TaskRunner().run({ version: 1, name: '关注', steps: [list] }, session, (event) => events.push(event))
+    expect(request.mock.calls.filter(([op]) => op === 'tapRow')).toHaveLength(2)
+    expect(events).toContainEqual(expect.objectContaining({ kind: 'warning', message: '第 1 步：甲 已跳过：状态未变化' }))
+    expect(events.at(-1)).toMatchObject({ kind: 'partial', message: '任务部分完成：成功 1，跳过 1，原已完成 0' })
+  })
+
   it('先启动目标 App，再执行步骤并保存成功日志', async () => {
     const order: string[] = []
     const session = {

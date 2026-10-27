@@ -1,3 +1,6 @@
+/**
+ * Android 控件树解析：提取元素属性与屏幕边界，供拾取和定位建议使用。
+ */
 import { XMLParser } from 'fast-xml-parser'
 import type { Bounds, UiNode } from '../shared/types'
 
@@ -25,6 +28,7 @@ export function parseHierarchy(xml: string): UiNode[] {
       className: String(node['@_class'] ?? ''),
       packageName: String(node['@_package'] ?? ''),
       clickable: node['@_clickable'] === 'true',
+      scrollable: node['@_scrollable'] === 'true',
       bounds: parseBounds(String(node['@_bounds'] ?? ''))
     })
     const children = node.node ? (Array.isArray(node.node) ? node.node : [node.node]) : []

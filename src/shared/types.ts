@@ -62,7 +62,7 @@ export type UiNode = {
   className: string
   packageName: string
   clickable: boolean
-  scrollable: boolean
+  scrollable?: boolean
   bounds: Bounds
 }
 
@@ -102,7 +102,7 @@ export type RunEvent = {
 export type SessionState = { serial: string; connected: boolean }
 
 export type DeviceRunStatus = 'pending' | 'running' | 'success' | 'partial' | 'failure' | 'cancelled'
-export type ListRow = { name: string; key: string; hasAction: boolean; hasCompleted: boolean; error?: string }
+export type ListRow = { name: string; key: string; hasAction: boolean; hasCompleted: boolean; deferred?: boolean; error?: string }
 export type MatchInfo = { bounds: Bounds; index: number }
 export type DeviceRun = { serial: string; status: DeviceRunStatus; stepIndex?: number; error?: string; runDir?: string }
 export type BatchRecord = {
@@ -125,6 +125,7 @@ export type AppApi = {
   snapshot(serial: string): Promise<HierarchySnapshot>
   count(serial: string, selector: Selector): Promise<number>
   inspectMatches(serial: string, selector: Selector): Promise<MatchInfo[]>
+  previewList(serial: string, step: ListClickStep): Promise<ListRow[]>
   saveTask(task: AutomationTask): Promise<string | null>
   loadTask(): Promise<AutomationTask | null>
   runTask(task: AutomationTask, serials: string[]): Promise<BatchRecord>

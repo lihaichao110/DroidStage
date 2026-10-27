@@ -2,7 +2,7 @@
  * 任务格式与控件定位纯逻辑测试。
  */
 import { describe, expect, it } from 'vitest'
-import { crossAppWarning, findNodeAt, flowStepNumber, mapClientToScreen, mapScreenToRect, stepDetail, stepSummary, stepTitle, stepTypeOptions, suggestedSelector, validateTask } from '../src/shared/task'
+import { crossAppWarning, findNodeAt, flowStepNumber, indexedMatchIsDistinct, mapClientToScreen, mapScreenToRect, stepDetail, stepSummary, stepTitle, stepTypeOptions, suggestedSelector, validateTask } from '../src/shared/task'
 import { parseHierarchy } from '../src/main/hierarchy'
 
 const node = {
@@ -50,6 +50,19 @@ describe('任务格式', () => {
     expect(() => validateTask(JSON.parse(JSON.stringify(task)))).not.toThrow()
   })
 
+  it('允许选第 2 个匹配项，并拒绝无效序号与不合法列表参数', () => {
+    const selector = { kind: 'text', value: '搜索', matchIndex: 2 }
+    expect(() => validateTask({ version: 1, name: 'x', steps: [{ id: 'a', type: 'tap', selector, timeoutMs: 1000 }] })).not.toThrow()
+    expect(() => validateTask({ version: 1, name: 'x', steps: [{ id: 'a', type: 'tap', selector: { ...selector, matchIndex: 0 }, timeoutMs: 1000 }] })).toThrow('匹配序号')
+    const list = { id: 'list', type: 'listClick', container: selector, row: { kind: 'className', value: 'Row' },
+      name: { kind: 'text', value: '名称' }, identity: { kind: 'resourceId', value: 'id/name' },
+      action: { kind: 'text', value: '关注' }, completed: { kind: 'text', value: '已关注' }, maxScrolls: 100, timeoutMs: 1000 }
+    const wrap = (step: unknown) => ({ version: 1, name: 'x', steps: [step] })
+    expect(() => validateTask(wrap(list))).not.toThrow()
+    expect(() => validateTask(wrap({ ...list, maxScrolls: 1001 }))).toThrow('最多滚动次数')
+    expect(() => validateTask(wrap({ ...list, name: selector }))).toThrow('行内定位')
+  })
+
   it('条件步骤的重复执行次数可省略，填写时须为 1–100 的整数', () => {
     const base = { id: 'condition', type: 'condition', selector: { kind: 'text', value: '关注' }, mode: 'once', whenPresent: [], whenAbsent: [] }
     const wrap = (step: unknown) => ({ version: 1, name: '重复校验', steps: [step] })
@@ -73,6 +86,16 @@ describe('任务格式', () => {
 })
 
 describe('页面控件定位', () => {
+  it('按屏幕顺序选中下方控件，目标减少或位置重合时拒绝序号', () => {
+    const upper = { ...node, id: 'upper', text: '搜索', bounds: { left: 0, top: 20, right: 100, bottom: 60 } }
+    const lower = { ...upper, id: 'lower', bounds: { left: 0, top: 200, right: 100, bottom: 240 } }
+    expect(suggestedSelector(lower, [lower, upper])).toEqual({ kind: 'resourceId', value: node.resourceId, matchIndex: 2 })
+    expect(indexedMatchIsDistinct([upper.bounds, lower.bounds], 2)).toBe(true)
+    expect(indexedMatchIsDistinct([upper.bounds], 2)).toBe(false)
+    expect(indexedMatchIsDistinct([upper.bounds, upper.bounds], 2)).toBe(false)
+    const overlap = { ...lower, id: 'overlap', resourceId: upper.resourceId }
+    expect(suggestedSelector(lower, [upper, lower, overlap])).toBeNull()
+  })
   it('可点击控件的描述唯一时优先推荐描述，并选中点击坐标处最小控件', () => {
     const root = { ...node, id: 'root', bounds: { left: 0, top: 0, right: 200, bottom: 200 } }
     expect(suggestedSelector({ ...node, description: '登录' }, [root, { ...node, description: '登录' }]))
@@ -82,8 +105,8 @@ describe('页面控件定位', () => {
 
   it('重复描述、无描述或不可点击时沿用资源 ID', () => {
     const described = { ...node, description: '关注' }
-    expect(suggestedSelector(described, [described, { ...described, id: 'other' }]))
-      .toEqual({ kind: 'resourceId', value: 'com.example:id/login' })
+    expect(suggestedSelector(described, [described, { ...described, id: 'other', bounds: { left: 10, top: 100, right: 110, bottom: 160 } }]))
+      .toEqual({ kind: 'resourceId', value: 'com.example:id/login', matchIndex: 1 })
     expect(suggestedSelector(node, [node])).toEqual({ kind: 'resourceId', value: 'com.example:id/login' })
     expect(suggestedSelector({ ...described, clickable: false }, [{ ...described, clickable: false }]))
       .toEqual({ kind: 'resourceId', value: 'com.example:id/login' })
@@ -126,7 +149,7 @@ describe('录制辅助', () => {
   })
 
   it('步骤类型下拉选项与流程卡、运行记录使用同一套名称', () => {
-    expect(stepTypeOptions.map((option) => option.label)).toEqual(['点击控件', '输入文本', '滑动屏幕', '等待控件', '断言控件', '条件判断', '保存截图', '按下按键'])
+    expect(stepTypeOptions.map((option) => option.label)).toEqual(['点击控件', '输入文本', '滑动屏幕', '等待控件', '断言控件', '条件判断', '遍历列表并点击', '保存截图', '按下按键'])
     expect(stepTypeOptions.every((option) => option.label === stepTitle(option.value))).toBe(true)
   })
 

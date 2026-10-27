@@ -21,6 +21,7 @@ const STEP_META: Record<Step['type'], { icon: string; help: string }> = {
   wait: { icon: '◷', help: '等待目标控件出现或消失' },
   assert: { icon: '✓', help: '核验目标控件的存在状态' },
   condition: { icon: '◇', help: '按控件存在状态执行不同动作' },
+  listClick: { icon: '↧', help: '逐行点击未完成的用户并滚动到末尾' },
   screenshot: { icon: '▣', help: '保存当前设备画面' },
   key: { icon: '↶', help: '向设备发送返回或 Home' }
 }
@@ -81,6 +82,6 @@ export function WorkflowPanel({ task, activeStepId, isRunning, onTaskChange, onN
 }
 
 /** 按执行顺序概览分支动作，空分支明确显示为跳过。 */
-function branchDetail(actions: Exclude<Step, { type: 'condition' }>[]): string {
+function branchDetail(actions: Exclude<Step, { type: 'condition' | 'listClick' }>[]): string {
   return actions.length ? actions.map((action) => `${stepTitle(action.type)} · ${stepDetail(action)}`).join(' → ') : '跳过'
 }

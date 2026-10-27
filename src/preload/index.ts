@@ -1,5 +1,8 @@
+/**
+ * 预加载桥接：向渲染进程暴露受控的设备、任务和投屏 IPC 接口。
+ */
 import { contextBridge, ipcRenderer } from 'electron'
-import type { AppApi, AutomationTask, MirrorStatus, RunEvent, ScrollInput, Selector, TouchInput } from '../shared/types'
+import type { AppApi, AutomationTask, ListClickStep, MirrorStatus, RunEvent, ScrollInput, Selector, TouchInput } from '../shared/types'
 
 const api: AppApi = {
   listDevices: () => ipcRenderer.invoke('devices:list'),
@@ -11,6 +14,8 @@ const api: AppApi = {
   sessionStates: () => ipcRenderer.invoke('device:states'),
   snapshot: (serial: string) => ipcRenderer.invoke('device:snapshot', serial),
   count: (serial: string, selector: Selector) => ipcRenderer.invoke('device:count', serial, selector),
+  inspectMatches: (serial: string, selector: Selector) => ipcRenderer.invoke('device:matches', serial, selector),
+  previewList: (serial: string, step: ListClickStep) => ipcRenderer.invoke('device:list-preview', serial, step),
   saveTask: (task: AutomationTask) => ipcRenderer.invoke('task:save', task),
   loadTask: () => ipcRenderer.invoke('task:load'),
   runTask: (task: AutomationTask, serials: string[]) => ipcRenderer.invoke('task:run', task, serials),

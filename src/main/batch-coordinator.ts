@@ -114,7 +114,7 @@ export class BatchCoordinator {
         record.events.push(event)
         if (event.kind === 'step') device.stepIndex = event.stepIndex
         if (event.kind === 'failure') device.error = event.message
-        if (event.kind === 'success' || event.kind === 'failure' || event.kind === 'cancelled') device.status = event.kind
+        if (event.kind === 'success' || event.kind === 'partial' || event.kind === 'failure' || event.kind === 'cancelled') device.status = event.kind
         this.emit(event)
         this.queuePersist(record)
       }, { batchId: record.id, serial, runDir })

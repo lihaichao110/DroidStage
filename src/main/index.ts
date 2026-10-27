@@ -85,6 +85,16 @@ app.whenReady().then(() => {
     validateSelector(selector)
     return devices.require(serial).count(selector)
   })
+  ipcMain.handle('device:matches', (_event, serial: string, selector: Selector) => {
+    if (batches.isRunning(serial)) throw new Error('任务运行中不能校验控件')
+    validateSelector(selector)
+    return devices.require(serial).agent().request('inspectMatches', { selector })
+  })
+  ipcMain.handle('device:list-preview', (_event, serial: string, step: import('../shared/types').ListClickStep) => {
+    if (batches.isRunning(serial)) throw new Error('任务运行中不能校验列表')
+    validateTask({ version: 1, name: '列表预览', steps: [step] })
+    return devices.require(serial).agent().request('scanRows', step)
+  })
   ipcMain.handle('mirror:start', async (_event, serial: string, quality: 'editor' | 'wall') => {
     if (!window) throw new Error('窗口未就绪')
     devices.require(serial)

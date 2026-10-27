@@ -29,7 +29,7 @@ class AgentTest {
 
     private val device by lazy { UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()) }
     private val locator by lazy { ElementLocator(device) }
-    private val lists by lazy { ListOperations(device, locator) }
+    private val lists by lazy { ListOperations(locator) }
     // 触摸/滚轮注入独立于 UiDevice 高层 API，见 TouchInjector 注释
     private val injector by lazy { TouchInjector(InstrumentationRegistry.getInstrumentation().uiAutomation) }
     private val token by lazy { InstrumentationRegistry.getArguments().getString("token") ?: error("缺少会话密钥") }

@@ -3,7 +3,7 @@
  */
 import { useRef, useState } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
-import type { AutomationTask, ConditionStep, Point, Selector, Step, UiNode } from '../../../shared/types'
+import type { AutomationTask, ConditionStep, ListClickStep, Point, Selector, Step, UiNode } from '../../../shared/types'
 import { crossAppWarning, validateSelector, validateTask } from '../../../shared/task'
 
 export type StepSubmissionState =
@@ -33,6 +33,8 @@ type SubmissionDraft = {
   swipeDuration: number
   buildCondition: (id: string, selector: Selector) => ConditionStep
   resetCondition: () => void
+  buildList: (id: string) => ListClickStep
+  resetList: () => void
 }
 
 class SelectorMatchError extends Error {}
@@ -99,6 +101,14 @@ export function useStepSubmission(draft: SubmissionDraft) {
           if (count > 1) throw new SelectorMatchError(`当前定位条件匹配 ${count} 个控件，需要更具体的定位条件`)
         }
         step = draft.buildCondition(id, selector)
+      } else if (action === 'listClick') {
+        const candidate = draft.buildList(id)
+        validateTask({ version: 1, name: task.name || '列表校验', steps: [candidate] })
+        if (!connected || !focused) throw new Error('请先连接编辑设备')
+        const rows = await window.androidAutoDesk.previewList(focused, candidate)
+        if (!rows.length) throw new Error('当前滚动容器中未找到用户行')
+        if (rows.every((row) => row.error)) throw new Error(`当前用户行无法识别：${rows[0].error}`)
+        step = candidate
       } else if (action === 'screenshot') {
         step = { id, type: 'screenshot' }
       } else {
@@ -110,6 +120,7 @@ export function useStepSubmission(draft: SubmissionDraft) {
       draft.setTask(next)
       draft.setEditingId(null)
       draft.resetCondition()
+      draft.resetList()
       const success = editingId ? '步骤已修改。' : '步骤已添加到流程。'
       // 只对控件定位做跨应用提醒；坐标点击已有单独的布局风险提示。
       const warning = step.type === 'tap' && step.point ? '坐标点击可能在页面布局变化后失效。'

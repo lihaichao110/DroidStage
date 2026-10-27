@@ -2,11 +2,12 @@
  * 步骤设置面板：编辑动作参数，并结合控件树检查拾取目标。
  */
 import { useEffect, useRef, useState } from 'react'
-import type { AutomationTask, BasicStep, HierarchySnapshot, Point, Selector, Step, UiNode } from '../../../shared/types'
+import type { AutomationTask, BasicStep, HierarchySnapshot, ListClickStep, Point, Selector, Step, UiNode } from '../../../shared/types'
 import { stepTypeOptions } from '../../../shared/task'
 import { ElementDetails } from './element-details'
 import { HierarchyTree } from './hierarchy-tree'
 import { ConditionEditor } from './condition-editor'
+import { ListClickEditor } from './list-click-editor'
 import type { StepSubmissionState } from '../hooks/use-step-submission'
 
 type EditorAction = Step['type']
@@ -24,6 +25,8 @@ type StepSettingsProps = {
   intervalMs: number
   whenPresent: BasicStep[]
   whenAbsent: BasicStep[]
+  listValue: Omit<ListClickStep, 'id' | 'type'>
+  onListChange: <K extends keyof Omit<ListClickStep, 'id' | 'type'>>(field: K, value: Omit<ListClickStep, 'id' | 'type'>[K]) => void
   keyValue: 'back' | 'home'
   swipeFrom: Point
   swipeTo: Point
@@ -74,7 +77,7 @@ export function StepSettings(props: StepSettingsProps) {
   const isSubmitting = props.submission.phase === 'pending'
   const disabledReason = isRunning ? '任务运行中暂不能修改步骤。'
     : isBranchEditing ? '请先保存或取消正在编辑的分支动作。'
-      : !isConnected && needsTarget && action !== 'condition' ? '请先连接编辑设备，再添加此类步骤。' : null
+      : !isConnected && (needsTarget && action !== 'condition' || action === 'listClick') ? '请先连接编辑设备，再添加此类步骤。' : null
   useEffect(() => { setBranchEditing(false) }, [action, editingId])
 
   /** 展开定位区并滚动到可修改的控件属性。 */
@@ -114,6 +117,7 @@ export function StepSettings(props: StepSettingsProps) {
           whenAbsent={props.whenAbsent} onWhenAbsentChange={props.onWhenAbsentChange}
           onEditingChange={setBranchEditing}
         />}
+        {action === 'listClick' && <ListClickEditor value={props.listValue} selectedNode={selectedNode} nodes={snapshot?.nodes ?? NO_NODES} onChange={props.onListChange} />}
         {action === 'key' && <label className="setting-field">按键<select value={keyValue} onChange={(event) => props.onKeyChange(event.target.value as 'back' | 'home')}><option value="back">返回</option><option value="home">Home</option></select></label>}
         {action === 'swipe' && <div className="swipe-grid">
           <label className="setting-field">起点 X<input type="number" value={swipeFrom.x} onChange={(event) => props.onSwipeFromChange({ ...swipeFrom, x: Number(event.target.value) })} /></label>
@@ -134,7 +138,7 @@ export function StepSettings(props: StepSettingsProps) {
       <div className="element-section" ref={elementRef} inert={isSubmitting}>
         <button className="element-toggle" onClick={() => setTargetOpen(!isTargetOpen)} aria-expanded={isTargetOpen}><span>⌖　元素定位与控件树</span><span>{isTargetOpen ? '⌃' : '⌄'}</span></button>
         {isTargetOpen && <div className="element-content">
-          <ElementDetails serial={props.serial} node={selectedNode} selector={selector} selectedPoint={selectedPoint} isConnected={isConnected} onSelectorChange={props.onSelectorChange} />
+          <ElementDetails serial={props.serial} node={selectedNode} nodes={snapshot?.nodes ?? NO_NODES} selector={selector} selectedPoint={selectedPoint} isConnected={isConnected} onSelectorChange={props.onSelectorChange} />
           <HierarchyTree nodes={snapshot?.nodes ?? NO_NODES} selectedId={selectedNode?.id ?? null} hoverNode={hoverNode} onSelect={props.onSelectNode} onHoverNode={props.onHoverNode} />
         </div>}
       </div>

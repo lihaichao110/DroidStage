@@ -2,11 +2,13 @@
  * 选中控件详情：完整属性表、定位方式选择，以及当前定位条件的实时匹配数校验。
  */
 import { useEffect, useState } from 'react'
-import type { Point, Selector, UiNode } from '../../../shared/types'
+import type { MatchInfo, Point, Selector, UiNode } from '../../../shared/types'
+import { indexedMatchIsDistinct, sortedMatches } from '../../../shared/task'
 
 type ElementDetailsProps = {
   serial: string
   node: UiNode | null
+  nodes: readonly UiNode[]
   selector: Selector | null
   selectedPoint: Point | null
   isConnected: boolean
@@ -19,10 +21,10 @@ const COUNT_DEBOUNCE_MS = 300
 type MatchState =
   | { status: 'idle' }
   | { status: 'loading' }
-  | { status: 'done'; count: number }
+  | { status: 'done'; matches: MatchInfo[] }
   | { status: 'error'; message: string }
 
-export function ElementDetails({ serial, node, selector, selectedPoint, isConnected, onSelectorChange }: ElementDetailsProps) {
+export function ElementDetails({ serial, node, nodes, selector, selectedPoint, isConnected, onSelectorChange }: ElementDetailsProps) {
   const [match, setMatch] = useState<MatchState>({ status: 'idle' })
 
   const kind = selector?.kind
@@ -35,14 +37,15 @@ export function ElementDetails({ serial, node, selector, selectedPoint, isConnec
       return
     }
     setMatch({ status: 'loading' })
+    let active = true
     const timer = setTimeout(() => {
-      window.androidAutoDesk.count(serial, selector)
-        .then((count) => setMatch({ status: 'done', count }))
-        .catch((error: unknown) => setMatch({ status: 'error', message: error instanceof Error ? error.message : String(error) }))
+      window.androidAutoDesk.inspectMatches(serial, selector)
+        .then((matches) => { if (active) setMatch({ status: 'done', matches }) })
+        .catch((error: unknown) => { if (active) setMatch({ status: 'error', message: error instanceof Error ? error.message : String(error) }) })
     }, COUNT_DEBOUNCE_MS)
-    return () => clearTimeout(timer)
+    return () => { active = false; clearTimeout(timer) }
     // 依赖取 kind/value 而非 selector 对象：同值新对象不重复查询
-  }, [serial, isConnected, kind, value, selector])
+  }, [serial, isConnected, kind, value])
 
   /** 切换定位方式：从选中控件取对应属性值；选“坐标”即清除控件定位。 */
   function changeKind(next: string): void {
@@ -55,7 +58,11 @@ export function ElementDetails({ serial, node, selector, selectedPoint, isConnec
       : selectorKind === 'description' ? node?.description
         : selectorKind === 'text' ? node?.text
           : node?.className
-    onSelectorChange(nextValue ? { kind: selectorKind, value: nextValue } : null)
+    if (!nextValue) { onSelectorChange(null); return }
+    const candidates = sortedMatches(nodes.filter((candidate) => candidate[selectorKind] === nextValue))
+    const index = candidates.findIndex((candidate) => candidate.id === node?.id)
+    const isDistinct = index >= 0 && indexedMatchIsDistinct(candidates.map((candidate) => candidate.bounds), index + 1)
+    onSelectorChange({ kind: selectorKind, value: nextValue, ...(candidates.length > 1 && isDistinct ? { matchIndex: index + 1 } : {}) })
   }
 
   return <div className="selection">
@@ -69,6 +76,7 @@ export function ElementDetails({ serial, node, selector, selectedPoint, isConnec
           <AttrRow label="类名" value={node.className} />
           <AttrRow label="所属应用" value={node.packageName} />
           <AttrRow label="可点击" value={node.clickable ? '是' : '否'} />
+          <AttrRow label="可滚动" value={node.scrollable ? '是' : '否'} />
           <AttrRow label="边界" value={`[${node.bounds.left},${node.bounds.top}] [${node.bounds.right},${node.bounds.bottom}]`} />
           <AttrRow label="节点路径" value={node.id} />
         </tbody>
@@ -81,7 +89,7 @@ export function ElementDetails({ serial, node, selector, selectedPoint, isConnec
         <option value="point">坐标（布局变化风险）</option>
       </select></label>
     </> : <span>{selector ? `${selector.kind}: ${selector.value}` : selectedPoint ? `坐标 (${selectedPoint.x}, ${selectedPoint.y})` : '未选择'}</span>}
-    {selector && <MatchStatus match={match} />}
+    {selector && <MatchStatus match={match} selector={selector} onSelectorChange={onSelectorChange} />}
   </div>
 }
 
@@ -90,10 +98,20 @@ function AttrRow({ label, value }: { label: string; value: string }) {
   return <tr><th>{label}</th><td>{value || '—'}</td></tr>
 }
 
-function MatchStatus({ match }: { match: MatchState }) {
+function MatchStatus({ match, selector, onSelectorChange }: { match: MatchState; selector: Selector; onSelectorChange: (selector: Selector) => void }) {
   if (match.status === 'idle') return null
   if (match.status === 'loading') return <small className="match-loading">正在统计匹配数…</small>
   if (match.status === 'error') return <small className="match-warn">匹配数查询失败：{match.message}</small>
-  if (match.count === 1) return <small className="match-ok">当前定位条件匹配 1 个控件</small>
-  return <small className="match-warn">当前定位条件匹配 {match.count} 个控件，需恰好 1 个</small>
+  const { matches } = match
+  const selected = selector.matchIndex ?? (matches.length === 1 ? 1 : 0)
+  const target = matches.find((item) => item.index === selected)
+  const ambiguous = target && matches.some((item) => item.index !== selected && JSON.stringify(item.bounds) === JSON.stringify(target.bounds))
+  return <div className="match-options">
+    <small className={target && !ambiguous ? 'match-ok' : 'match-warn'}>当前定位条件匹配 {matches.length} 个控件{selector.matchIndex ? `，已选第 ${selector.matchIndex} 个` : matches.length === 1 ? '' : '，请选择目标序号'}{ambiguous ? '；目标边界与其他控件重合，无法安全区分' : ''}</small>
+    {matches.map((item) => <label key={item.index} className={selected === item.index ? 'match-choice selected' : 'match-choice'}>
+      <input type="radio" name="match-index" checked={selected === item.index} onChange={() => onSelectorChange({ ...selector, matchIndex: item.index })} />
+      第 {item.index} 个　[{item.bounds.left},{item.bounds.top}]–[{item.bounds.right},{item.bounds.bottom}]
+    </label>)}
+    {selector.matchIndex && <button type="button" className="submission-link" onClick={() => onSelectorChange({ kind: selector.kind, value: selector.value })}>取消指定序号</button>}
+  </div>
 }

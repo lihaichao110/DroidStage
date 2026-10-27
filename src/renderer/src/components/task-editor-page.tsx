@@ -10,6 +10,7 @@ import { StepSettings } from './step-settings'
 import { useTaskActions } from '../hooks/use-task-actions'
 import { useConditionDraft } from '../hooks/use-condition-draft'
 import { useStepSubmission } from '../hooks/use-step-submission'
+import { useListClickDraft } from '../hooks/use-list-click-draft'
 
 type EditorAction = Step['type']
 const defaultTask: AutomationTask = { version: 1, name: '新任务', packageName: '', steps: [] }
@@ -41,6 +42,7 @@ export function TaskEditorPage({ active, devices, connectedSerials, focused, tar
   const [timeout, setTimeoutValue] = useState(10000)
   const [exists, setExists] = useState(true)
   const conditionDraft = useConditionDraft()
+  const listDraft = useListClickDraft()
   const [key, setKey] = useState<'back' | 'home'>('back')
   const [swipeFrom, setSwipeFrom] = useState<Point>({ x: 300, y: 700 })
   const [swipeTo, setSwipeTo] = useState<Point>({ x: 300, y: 300 })
@@ -52,7 +54,8 @@ export function TaskEditorPage({ active, devices, connectedSerials, focused, tar
   const { submit, submission, clearFeedback, isSubmitting } = useStepSubmission({
     task, setTask, setEditingId, setMessage, focused, connected, editingId, action, selector,
     selectedNode, selectedPoint, text, timeout, exists, keyValue: key, swipeFrom, swipeTo,
-    swipeDuration, buildCondition: conditionDraft.build, resetCondition: conditionDraft.reset
+    swipeDuration, buildCondition: conditionDraft.build, resetCondition: conditionDraft.reset,
+    buildList: listDraft.build, resetList: listDraft.reset
   })
 
   useEffect(() => {
@@ -113,6 +116,8 @@ export function TaskEditorPage({ active, devices, connectedSerials, focused, tar
     if (step.type === 'wait' || step.type === 'assert') setExists(step.exists)
     if (step.type === 'condition') conditionDraft.load(step)
     else conditionDraft.reset()
+    if (step.type === 'listClick') listDraft.load(step)
+    else listDraft.reset()
     if (step.type === 'swipe') { setSwipeFrom(step.from); setSwipeTo(step.to); setSwipeDuration(step.durationMs) }
     if (step.type === 'key') setKey(step.key)
     setMessage('正在修改步骤；选择新控件可替换原定位条件。')
@@ -129,9 +134,10 @@ export function TaskEditorPage({ active, devices, connectedSerials, focused, tar
     clearFeedback()
     setEditingId(null)
     conditionDraft.reset()
+    listDraft.reset()
     setMessage('在右侧配置新步骤。')
   }
-  const { save, load, run, saveAndRun } = useTaskActions({ task, setTask, setEditingId, setMessage, onTaskLoaded: conditionDraft.reset, targets, onBatchStarted })
+  const { save, load, run, saveAndRun } = useTaskActions({ task, setTask, setEditingId, setMessage, onTaskLoaded: () => { conditionDraft.reset(); listDraft.reset() }, targets, onBatchStarted })
 
   return <div className={`editor-page${active ? '' : ' page-hidden'}`}>
     <div className="editor-toolbar">
@@ -183,6 +189,8 @@ export function TaskEditorPage({ active, devices, connectedSerials, focused, tar
         intervalMs={conditionDraft.intervalMs}
         whenPresent={conditionDraft.whenPresent}
         whenAbsent={conditionDraft.whenAbsent}
+        listValue={listDraft.value}
+        onListChange={listDraft.update}
         keyValue={key}
         swipeFrom={swipeFrom}
         swipeTo={swipeTo}

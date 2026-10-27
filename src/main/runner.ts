@@ -8,6 +8,7 @@ import path from 'node:path'
 import type { AutomationTask, BasicStep, ConditionStep, RunEvent } from '../shared/types'
 import { flowStepNumber, stepSummary, validateTask } from '../shared/task'
 import { DeviceSession } from './session'
+import { runListClick } from './list-runner'
 
 const CONDITION_ONCE_WAIT_MS = 2000 // 判断一次时给动态页面留出控件树刷新时间，避免启动后立即误判不存在
 
@@ -30,6 +31,10 @@ export class TaskRunner {
       emit(item)
     }
     let failedIndex: number | undefined
+    let listSuccess = 0
+    let listSkipped = 0
+    let listAlreadyDone = 0
+    let hasListStep = false
     try {
       await mkdir(runDir, { recursive: true })
       await writeFile(path.join(runDir, 'task.json'), JSON.stringify(task, null, 2), 'utf8')
@@ -61,6 +66,15 @@ export class TaskRunner {
                 throw new Error(`第 ${repeatIndex}/${repeatCount} 次执行失败：${error instanceof Error ? error.message : String(error)}`)
               }
             }
+          } else if (step.type === 'listClick') {
+            hasListStep = true
+            const result = await runListClick(step, session, () => this.throwIfCancelled(), async (name, reason) => {
+              await event('warning', `第 ${number} 步：${name} 已跳过：${reason}`, index)
+            })
+            listSuccess += result.success
+            listSkipped += result.skipped
+            listAlreadyDone += result.alreadyDone
+            await event('step', `第 ${number} 步：成功 ${result.success}，跳过 ${result.skipped}，原已完成 ${result.alreadyDone}`, index)
           } else {
             await this.executeBasicStep(step, session, runDir, `step-${String(index + 1).padStart(3, '0')}`)
           }
@@ -72,7 +86,9 @@ export class TaskRunner {
         }
       }
       if (this.cancelled) throw new CancelledError()
-      await event('success', '任务执行成功')
+      const listSummary = `成功 ${listSuccess}，跳过 ${listSkipped}，原已完成 ${listAlreadyDone}`
+      if (listSkipped) await event('partial', `任务部分完成：${listSummary}`)
+      else await event('success', `任务执行成功${hasListStep ? `：${listSummary}` : ''}`)
     } catch (error) {
       if (error instanceof CancelledError) {
         await event('cancelled', '任务已取消')
