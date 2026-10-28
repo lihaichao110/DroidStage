@@ -5,6 +5,7 @@ import { useRef, useState } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
 import type { AutomationTask, ConditionStep, ListClickStep, Point, Selector, Step, UiNode } from '../../../shared/types'
 import { crossAppWarning, validateSelector, validateTask } from '../../../shared/task'
+import { listPreviewIssue } from '../../../shared/list-preview'
 
 export type StepSubmissionState =
   | { phase: 'idle' }
@@ -106,8 +107,8 @@ export function useStepSubmission(draft: SubmissionDraft) {
         validateTask({ version: 1, name: task.name || '列表校验', steps: [candidate] })
         if (!connected || !focused) throw new Error('请先连接编辑设备')
         const rows = await window.androidAutoDesk.previewList(focused, candidate)
-        if (!rows.length) throw new Error('当前滚动容器中未找到用户行')
-        if (rows.every((row) => row.error)) throw new Error(`当前用户行无法识别：${rows[0].error}`)
+        const issue = listPreviewIssue(candidate, rows)
+        if (issue) throw new Error(issue)
         step = candidate
       } else if (action === 'screenshot') {
         step = { id, type: 'screenshot' }

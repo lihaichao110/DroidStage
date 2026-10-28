@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "name": "当前用户列表遍历关注",
+  "steps": [
+    {
+      "id": "follow-current-list",
+      "type": "listClick",
+      "mode": "rowState",
+      "container": { "kind": "resourceId", "value": "com.ss.android.ugc.aweme:id/cd" },
+      "row": { "kind": "className", "value": "android.widget.FrameLayout" },
+      "rowDepth": 1,
+      "action": { "kind": "description", "value": "关注按钮" },
+      "completed": { "kind": "description", "value": "已关注按钮" },
+      "maxScrolls": 15,
+      "timeoutMs": 40000
+    }
+  ]
+}

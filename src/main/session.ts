@@ -60,7 +60,9 @@ export class DeviceSession {
     if (!Number.isInteger(this.hostPort) || this.hostPort <= 0) throw new Error('ADB 端口映射失败')
     const token = randomBytes(24).toString('hex')
     this.token = token
-    this.process = await adbSpawn(onDevice(this.serial, ['shell', 'am', 'instrument', '-w', '-r', '-e', 'token', token, RUNNER]))
+    // 测试 APK 也包含模拟列表用例；正式会话只启动服务，避免退出服务后自动操作测试页面。
+    this.process = await adbSpawn(onDevice(this.serial, ['shell', 'am', 'instrument', '-w', '-r',
+      '-e', 'class', 'dev.androidautodesk.host.AgentTest#serve', '-e', 'token', token, RUNNER]))
     let instrumentOutput = ''
     this.process.stdout.on('data', (data: Buffer) => { instrumentOutput = (instrumentOutput + data.toString('utf8')).slice(-5000) })
     this.process.stderr.on('data', (data: Buffer) => { instrumentOutput = (instrumentOutput + data.toString('utf8')).slice(-5000) })

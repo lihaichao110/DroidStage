@@ -1,20 +1,51 @@
 /**
  * 任务与控件的纯逻辑：任务校验、控件定位建议、坐标换算与录制辅助文案。
  */
-import type { AutomationTask, BasicStep, Bounds, Selector, Step, UiNode } from './types'
+import type { AutomationTask, BasicStep, Bounds, ListClickDraft, ListClickStep, Selector, Step, UiNode } from './types'
 
 const packagePattern = /^[A-Za-z_][\w]*(\.[A-Za-z_][\w]*)+$/
 const selectorKinds = new Set(['resourceId', 'description', 'text', 'className'])
 
-export function validateSelector(value: unknown): asserts value is Selector {
-  if (!value || typeof value !== 'object') throw new Error('缺少控件定位条件')
+/** 列表步骤各定位字段的中文名：校验报错与编辑器共用一份，避免两处文案漂移。 */
+export const listFieldLabels = {
+  container: '滚动容器', row: '用户行', name: '显示名称', identity: '唯一标识',
+  action: '待点击按钮', completed: '完成状态控件'
+} as const
+
+/**
+ * 校验单个定位条件；传入字段名时报错会带上该名称并区分原因，便于用户定位是哪一项没配。
+ * @param value 待校验的定位条件
+ * @param label 字段中文名（如“用户行”），缺省时保持通用文案
+ */
+export function validateSelector(value: unknown, label?: string): asserts value is Selector {
+  if (!value || typeof value !== 'object') throw new Error(label ? `缺少「${label}」控件定位条件` : '缺少控件定位条件')
   const selector = value as Record<string, unknown>
-  if (!selectorKinds.has(String(selector.kind)) || typeof selector.value !== 'string' || !selector.value.trim()) {
+  const isKindValid = selectorKinds.has(String(selector.kind))
+  const isValueFilled = typeof selector.value === 'string' && Boolean(selector.value.trim())
+  if (label) {
+    if (!isKindValid) throw new Error(`「${label}」定位方式无效`)
+    if (!isValueFilled) throw new Error(`「${label}」定位值不能为空`)
+  } else if (!isKindValid || !isValueFilled) {
     throw new Error('控件定位条件无效')
   }
   if (selector.matchIndex !== undefined && (!Number.isInteger(selector.matchIndex) || Number(selector.matchIndex) < 1 || Number(selector.matchIndex) > 10000)) {
-    throw new Error('匹配序号必须为 1–10000')
+    throw new Error(label ? `「${label}」匹配序号必须为 1–10000` : '匹配序号必须为 1–10000')
   }
+}
+
+/**
+ * 草稿只序列化当前遍历模式需要的定位条件，避免隐藏字段阻碍校验。
+ * @param id 步骤 ID
+ * @param draft 编辑器草稿
+ * @returns 与所选模式对应的任务步骤
+ */
+export function buildListStep(id: string, draft: ListClickDraft): ListClickStep {
+  const common = { id, type: 'listClick' as const, container: draft.container, row: draft.row,
+    action: draft.action, completed: draft.completed, maxScrolls: draft.maxScrolls, timeoutMs: draft.timeoutMs }
+  return draft.mode === 'rowState'
+    ? { ...common, mode: 'rowState', rowDepth: draft.rowDepth ?? 0 }
+    : { ...common, mode: 'identity', name: draft.name, identity: draft.identity,
+      ...(draft.rowDepth ? { rowDepth: draft.rowDepth } : {}) }
 }
 
 export function validateTask(value: unknown): asserts value is AutomationTask {
@@ -41,9 +72,20 @@ export function validateTask(value: unknown): asserts value is AutomationTask {
     registerStep(raw)
     const step = raw as Step
     if (step.type === 'listClick') {
-      for (const field of ['container', 'row', 'name', 'identity', 'action', 'completed'] as const) validateSelector(step[field])
-      for (const field of ['row', 'name', 'identity', 'action', 'completed'] as const) {
+      if (step.mode !== undefined && step.mode !== 'identity' && step.mode !== 'rowState') throw new Error('列表遍历模式无效')
+      for (const field of ['container', 'row', 'action', 'completed'] as const) validateSelector(step[field], listFieldLabels[field])
+      for (const field of ['row', 'action', 'completed'] as const) {
         if (step[field].matchIndex !== undefined) throw new Error('列表行内定位不能使用全屏匹配序号')
+      }
+      if (step.mode === 'rowState') {
+        if (!Number.isInteger(step.rowDepth) || step.rowDepth < 1 || step.rowDepth > 20) throw new Error('用户行层级必须为 1–20')
+      } else {
+        validateSelector(step.name, listFieldLabels.name)
+        validateSelector(step.identity, listFieldLabels.identity)
+        for (const field of ['name', 'identity'] as const) {
+          if (step[field].matchIndex !== undefined) throw new Error('列表行内定位不能使用全屏匹配序号')
+        }
+        if (step.rowDepth !== undefined && (!Number.isInteger(step.rowDepth) || step.rowDepth < 1 || step.rowDepth > 20)) throw new Error('用户行层级必须为 1–20')
       }
       if (!Number.isInteger(step.maxScrolls) || step.maxScrolls < 1 || step.maxScrolls > 1000) throw new Error('最多滚动次数必须为 1–1000')
       validateTimeout(step.timeoutMs)
@@ -155,7 +197,7 @@ export function stepDetail(step: Step): string {
     case 'wait': return `${target(step.selector)} · ${step.exists ? '出现' : '消失'}`
     case 'assert': return `${target(step.selector)} · ${step.exists ? '存在' : '不存在'}`
     case 'condition': return `${target(step.selector)} · ${step.mode === 'once' ? '判断一次' : `最多检查 ${step.maxChecks} 次`}`
-    case 'listClick': return `行：${target(step.row)} · 点击：${target(step.action)} · 最多滚动 ${step.maxScrolls} 次`
+    case 'listClick': return `${step.mode === 'rowState' ? '按行状态' : '按唯一标识'} · 行：${target(step.row)} · 点击：${target(step.action)} · 最多滚动 ${step.maxScrolls} 次`
     case 'screenshot': return '当前设备画面'
     case 'key': return step.key === 'back' ? '返回' : 'Home'
   }
@@ -198,6 +240,45 @@ export function suggestedSelector(node: UiNode, nodes: readonly UiNode[]): Selec
     return { kind, value, ...(matches.length > 1 ? { matchIndex: index + 1 } : {}) }
   }
   return null
+}
+
+/**
+ * 从当前层级确认示例行属于指定容器，并记录相对层级以排除同类名嵌套控件。
+ * @param container 已选滚动容器定位条件
+ * @param row 用户选中的示例行
+ * @param nodes 当前屏控件树
+ * @returns 示例行相对容器的层级
+ * @throws 容器或示例行无法唯一定位时抛出
+ */
+export function deriveRowDepth(container: Selector, row: UiNode, nodes: readonly UiNode[]): number {
+  const candidates = sortedMatches(nodes.filter((node) => node[container.kind] === container.value))
+  const parent = container.matchIndex ? candidates[container.matchIndex - 1] : candidates.length === 1 ? candidates[0] : null
+  if (!parent) throw new Error('滚动容器未唯一定位；请先拾取容器或指定匹配序号')
+  if (!row.id.startsWith(`${parent.id}.`)) throw new Error('所选用户行不在滚动容器内')
+  const depth = row.depth - parent.depth
+  if (!Number.isInteger(depth) || depth < 1 || depth > 20) throw new Error('用户行层级必须为 1–20')
+  return depth
+}
+
+/**
+ * 为示例行选择可覆盖同层其它行的定位条件，避免把单人专属资源 ID 当成整列模板。
+ * @param container 已选滚动容器定位条件
+ * @param row 用户选中的示例行
+ * @param nodes 当前屏控件树
+ * @returns 可用于整列用户行的定位条件
+ * @throws 容器、行或其定位属性无效时抛出
+ */
+export function suggestedRowSelector(container: Selector, row: UiNode, nodes: readonly UiNode[]): Selector {
+  deriveRowDepth(container, row, nodes)
+  const candidates = sortedMatches(nodes.filter((node) => node[container.kind] === container.value))
+  const parent = container.matchIndex ? candidates[container.matchIndex - 1] : candidates[0]
+  const peers = nodes.filter((node) => node.depth === row.depth && node.id.startsWith(`${parent.id}.`))
+  if (row.resourceId && peers.filter((peer) => peer.resourceId === row.resourceId).length > 1) {
+    return { kind: 'resourceId', value: row.resourceId }
+  }
+  if (row.className) return { kind: 'className', value: row.className }
+  if (row.resourceId) return { kind: 'resourceId', value: row.resourceId }
+  throw new Error('所选用户行没有可用于遍历的类名或资源 ID')
 }
 
 /** 按屏幕几何顺序排序；完全相同的边界无法可靠指定序号。 */

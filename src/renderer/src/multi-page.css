@@ -34,4 +34,11 @@
 .list-field strong { grid-column: 1 / -1; font-size: 12px; }
 .list-field input { min-width: 0; }
 .list-field button { grid-column: 1 / -1; }
+/* 预览失败时给定位值为空的字段行加红色描边，直接指出缺哪一项 */
+.list-field-missing { padding: 5px; border: 1px solid #d9827c; border-radius: 6px; }
+.list-field-missing input { border-color: #b73e36; }
+.list-preview{display:grid;gap:5px;padding:9px;border:1px solid #dce8f8;border-radius:8px;background:#f8fbff;font-size:12px}
+.list-preview-row{display:grid;grid-template-columns:60px 72px 1fr;gap:7px;padding:5px 0;border-top:1px solid #e8eef8;align-items:start}
+.list-preview-row small{overflow-wrap:anywhere;color:#7388a5}
+.list-preview-error,.list-preview-row small.list-preview-error{color:#b73e36!important}
 .run-partial, .run-warning { color: #b56812; }

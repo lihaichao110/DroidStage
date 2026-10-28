@@ -2,4 +2,8 @@
     <item name="test_input" type="id" />
     <item name="test_button" type="id" />
     <item name="test_result" type="id" />
+    <item name="test_list" type="id" />
+    <item name="test_row" type="id" />
+    <item name="test_nested" type="id" />
+    <item name="test_follow" type="id" />
 </resources>

@@ -78,6 +78,24 @@ describe('任务执行器', () => {
     expect(events.at(-1)?.kind).toBe('success')
   })
 
+  it('输入未生效时保留失败步骤并保存现场截图', async () => {
+    const request = vi.fn(async () => { throw new Error('输入未生效（资源 ID：test_input）：文本不一致') })
+    const session = {
+      agent: () => ({ request }), screenshot: vi.fn(async () => Buffer.from('fake png'))
+    } as unknown as DeviceSession
+    const events: RunEvent[] = []
+    const inputTask: AutomationTask = { version: 1, name: '输入核对', steps: [
+      { id: 'input', type: 'input', selector: { kind: 'resourceId', value: 'test_input' }, text: '中文abc', timeoutMs: 1000 }
+    ] }
+
+    await expect(new TaskRunner().run(inputTask, session, (event) => events.push(event)))
+      .rejects.toThrow('第 1 步（输入文本 · 资源 ID：test_input · 5 字）失败：输入未生效')
+    expect(request).toHaveBeenCalledWith('input', expect.objectContaining({ text: '中文abc' }), 7000)
+    expect(events.at(-1)).toMatchObject({ kind: 'failure', stepIndex: 0 })
+    expect((await stat(path.join(events[0].runDir!, 'failure.png'))).size).toBe(8)
+    expect(events.every((event) => !event.message.includes('中文abc'))).toBe(true)
+  })
+
   it('步骤失败时停止并保存失败截图', async () => {
     const session = {
       launch: vi.fn(async () => {}),

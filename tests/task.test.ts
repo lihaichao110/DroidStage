@@ -2,7 +2,7 @@
  * 任务格式与控件定位纯逻辑测试。
  */
 import { describe, expect, it } from 'vitest'
-import { crossAppWarning, findNodeAt, flowStepNumber, indexedMatchIsDistinct, mapClientToScreen, mapScreenToRect, stepDetail, stepSummary, stepTitle, stepTypeOptions, suggestedSelector, validateTask } from '../src/shared/task'
+import { buildListStep, crossAppWarning, deriveRowDepth, findNodeAt, flowStepNumber, indexedMatchIsDistinct, mapClientToScreen, mapScreenToRect, stepDetail, stepSummary, stepTitle, stepTypeOptions, suggestedRowSelector, suggestedSelector, validateTask } from '../src/shared/task'
 import { parseHierarchy } from '../src/main/hierarchy'
 
 const node = {
@@ -63,6 +63,40 @@ describe('任务格式', () => {
     expect(() => validateTask(wrap({ ...list, name: selector }))).toThrow('行内定位')
   })
 
+  it('列表步骤定位值缺失时报错指明具体字段；不带字段名的校验保持原文案', () => {
+    const wrap = (step: unknown) => ({ version: 1, name: 'x', steps: [step] })
+    const base = { id: 'list', type: 'listClick' as const, mode: 'rowState' as const, rowDepth: 1,
+      container: { kind: 'resourceId' as const, value: 'app:id/list' },
+      row: { kind: 'className' as const, value: 'Row' },
+      action: { kind: 'text' as const, value: '关注' }, completed: { kind: 'text' as const, value: '已关注' },
+      maxScrolls: 10, timeoutMs: 1000 }
+    expect(() => validateTask(wrap(base))).not.toThrow()
+    expect(() => validateTask(wrap({ ...base, row: { ...base.row, value: '' } }))).toThrow('「用户行」定位值不能为空')
+    expect(() => validateTask(wrap({ ...base, completed: { ...base.completed, value: '  ' } }))).toThrow('「完成状态控件」定位值不能为空')
+    expect(() => validateTask(wrap({ ...base, row: { kind: 'bogus' as 'className', value: 'Row' } }))).toThrow('「用户行」定位方式无效')
+    expect(() => validateTask(wrap({ ...base, container: { ...base.container, matchIndex: 0 } }))).toThrow('「滚动容器」匹配序号必须为 1–10000')
+    const identity = { ...base, mode: undefined, name: { kind: 'text' as const, value: '' }, identity: { kind: 'text' as const, value: 'ID' } }
+    expect(() => validateTask(wrap(identity))).toThrow('「显示名称」定位值不能为空')
+    // 普通步骤的校验不带字段名，保持原有通用文案
+    expect(() => validateTask({ version: 1, name: 'x', steps: [{ id: 'a', type: 'tap', selector: { kind: 'text', value: '' }, timeoutMs: 1000 }] })).toThrow('控件定位条件无效')
+  })
+
+  it('旧列表任务不写 mode 仍可读取；按行状态模式无需昵称和 ID', () => {
+    const common = { container: { kind: 'resourceId' as const, value: 'app:id/list' },
+      row: { kind: 'className' as const, value: 'android.widget.FrameLayout' },
+      name: { kind: 'text' as const, value: '' }, identity: { kind: 'text' as const, value: '' },
+      action: { kind: 'text' as const, value: '关注' }, completed: { kind: 'text' as const, value: '已关注' },
+      maxScrolls: 10, timeoutMs: 1000 }
+    const state = buildListStep('state', { ...common, mode: 'rowState', rowDepth: 1 })
+    expect(state).not.toHaveProperty('name')
+    expect(state).not.toHaveProperty('identity')
+    expect(() => validateTask({ version: 1, name: '关注', steps: [state] })).not.toThrow()
+    expect(() => validateTask({ version: 1, name: '关注', steps: [{ ...state, rowDepth: 0 }] })).toThrow('用户行层级')
+    expect(() => validateTask({ version: 1, name: '关注', steps: [{ ...state, mode: 'other' }] })).toThrow('列表遍历模式')
+    const legacy = { ...state, mode: undefined, name: { kind: 'text', value: '昵称' }, identity: { kind: 'text', value: 'ID' } }
+    expect(() => validateTask({ version: 1, name: '关注', steps: [legacy] })).not.toThrow()
+  })
+
   it('条件步骤的重复执行次数可省略，填写时须为 1–100 的整数', () => {
     const base = { id: 'condition', type: 'condition', selector: { kind: 'text', value: '关注' }, mode: 'once', whenPresent: [], whenAbsent: [] }
     const wrap = (step: unknown) => ({ version: 1, name: '重复校验', steps: [step] })
@@ -86,6 +120,23 @@ describe('任务格式', () => {
 })
 
 describe('页面控件定位', () => {
+  it('用户行层级从已定位容器推导，拒绝容器外的行和含糊容器', () => {
+    const container = { ...node, id: '0.1', depth: 1, resourceId: 'app:id/list' }
+    const row = { ...node, id: '0.1.2.0', depth: 3, resourceId: '', className: 'android.widget.FrameLayout' }
+    expect(deriveRowDepth({ kind: 'resourceId', value: 'app:id/list' }, row, [container, row])).toBe(2)
+    expect(() => deriveRowDepth({ kind: 'resourceId', value: 'app:id/list' }, { ...row, id: '0.2.0' }, [container, row])).toThrow('不在滚动容器内')
+    expect(() => deriveRowDepth({ kind: 'resourceId', value: 'app:id/list' }, row, [container, { ...container, id: '0.2' }, row])).toThrow('未唯一定位')
+  })
+  it('示例行的专属资源 ID 不会让其它同层用户行漏掉', () => {
+    const container = { ...node, id: '0.1', depth: 1, resourceId: 'app:id/list' }
+    const first = { ...node, id: '0.1.0', depth: 2, resourceId: 'app:id/user_1', className: 'android.widget.FrameLayout' }
+    const second = { ...first, id: '0.1.1', resourceId: 'app:id/user_2' }
+    const selector = { kind: 'resourceId' as const, value: 'app:id/list' }
+    expect(suggestedRowSelector(selector, first, [container, first, second])).toEqual({ kind: 'className', value: 'android.widget.FrameLayout' })
+    expect(suggestedRowSelector(selector, { ...first, resourceId: 'app:id/row' },
+      [container, { ...first, resourceId: 'app:id/row' }, { ...second, resourceId: 'app:id/row' }]))
+      .toEqual({ kind: 'resourceId', value: 'app:id/row' })
+  })
   it('按屏幕顺序选中下方控件，目标减少或位置重合时拒绝序号', () => {
     const upper = { ...node, id: 'upper', text: '搜索', bounds: { left: 0, top: 20, right: 100, bottom: 60 } }
     const lower = { ...upper, id: 'lower', bounds: { left: 0, top: 200, right: 100, bottom: 240 } }

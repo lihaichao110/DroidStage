@@ -9,6 +9,7 @@ import type { AutomationTask, BasicStep, ConditionStep, RunEvent } from '../shar
 import { flowStepNumber, stepSummary, validateTask } from '../shared/task'
 import { DeviceSession } from './session'
 import { runListClick } from './list-runner'
+import { listSummary } from './list-summary'
 
 const CONDITION_ONCE_WAIT_MS = 2000 // 判断一次时给动态页面留出控件树刷新时间，避免启动后立即误判不存在
 
@@ -31,10 +32,8 @@ export class TaskRunner {
       emit(item)
     }
     let failedIndex: number | undefined
-    let listSuccess = 0
-    let listSkipped = 0
-    let listAlreadyDone = 0
-    let hasListStep = false
+    const lists = { rowSuccess: 0, rowSkipped: 0, identitySuccess: 0, identitySkipped: 0,
+      identityDone: 0, hasRowState: false, hasIdentity: false }
     try {
       await mkdir(runDir, { recursive: true })
       await writeFile(path.join(runDir, 'task.json'), JSON.stringify(task, null, 2), 'utf8')
@@ -67,14 +66,22 @@ export class TaskRunner {
               }
             }
           } else if (step.type === 'listClick') {
-            hasListStep = true
             const result = await runListClick(step, session, () => this.throwIfCancelled(), async (name, reason) => {
               await event('warning', `第 ${number} 步：${name} 已跳过：${reason}`, index)
             })
-            listSuccess += result.success
-            listSkipped += result.skipped
-            listAlreadyDone += result.alreadyDone
-            await event('step', `第 ${number} 步：成功 ${result.success}，跳过 ${result.skipped}，原已完成 ${result.alreadyDone}`, index)
+            if (step.mode === 'rowState') {
+              lists.hasRowState = true
+              lists.rowSuccess += result.success
+              lists.rowSkipped += result.skipped
+            } else {
+              lists.hasIdentity = true
+              lists.identitySuccess += result.success
+              lists.identitySkipped += result.skipped
+              lists.identityDone += result.alreadyDone
+            }
+            await event('step', step.mode === 'rowState'
+              ? `第 ${number} 步：成功点击 ${result.success} 次，跳过 ${result.skipped} 行次`
+              : `第 ${number} 步：成功 ${result.success}，跳过 ${result.skipped}，原已完成 ${result.alreadyDone}`, index)
           } else {
             await this.executeBasicStep(step, session, runDir, `step-${String(index + 1).padStart(3, '0')}`)
           }
@@ -86,9 +93,9 @@ export class TaskRunner {
         }
       }
       if (this.cancelled) throw new CancelledError()
-      const listSummary = `成功 ${listSuccess}，跳过 ${listSkipped}，原已完成 ${listAlreadyDone}`
-      if (listSkipped) await event('partial', `任务部分完成：${listSummary}`)
-      else await event('success', `任务执行成功${hasListStep ? `：${listSummary}` : ''}`)
+      const summary = listSummary(lists)
+      if (lists.rowSkipped + lists.identitySkipped) await event('partial', `任务部分完成：${summary}`)
+      else await event('success', `任务执行成功${lists.hasRowState || lists.hasIdentity ? `：${summary}` : ''}`)
     } catch (error) {
       if (error instanceof CancelledError) {
         await event('cancelled', '任务已取消')
@@ -178,7 +185,8 @@ export class TaskRunner {
         await agent.request('tap', { selector: step.selector, point: step.point, timeoutMs: step.timeoutMs }, step.timeoutMs + 3000)
         return
       case 'input':
-        await agent.request('input', { selector: step.selector, text: step.text, timeoutMs: step.timeoutMs }, step.timeoutMs + 3000)
+        // 手机端写入后会核对并可能聚焦重试，网络等待须覆盖这段额外时间。
+        await agent.request('input', { selector: step.selector, text: step.text, timeoutMs: step.timeoutMs }, step.timeoutMs + 6000)
         return
       case 'swipe':
         await agent.request('swipe', { from: step.from, to: step.to, durationMs: step.durationMs })

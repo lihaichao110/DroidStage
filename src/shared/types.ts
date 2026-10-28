@@ -27,18 +27,30 @@ export type ConditionStep = {
   | { mode: 'repeatUntilPresent'; maxChecks: number; intervalMs: number }
 )
 
-/** 在同一个滚动容器中逐行执行动作，行内字段均相对于用户行查找。 */
-export type ListClickStep = {
+/** 列表步骤共用参数；行内控件都在同一用户行内查找。 */
+type ListClickBase = {
   id: string
   type: 'listClick'
   container: Selector
   row: Selector
-  name: Selector
-  identity: Selector
   action: Selector
   completed: Selector
   maxScrolls: number
   timeoutMs: number
+}
+
+/** 旧任务缺少 mode 时仍按唯一标识逐人去重。 */
+export type ListClickStep = ListClickBase & (
+  | { mode?: 'identity'; name: Selector; identity: Selector; rowDepth?: number }
+  | { mode: 'rowState'; rowDepth: number; name?: never; identity?: never }
+)
+
+/** 编辑草稿保留两种模式的输入，保存时只写入当前模式使用的字段。 */
+export type ListClickDraft = Omit<ListClickBase, 'id' | 'type'> & {
+  mode: 'identity' | 'rowState'
+  name: Selector
+  identity: Selector
+  rowDepth?: number
 }
 
 export type Step = BasicStep | ConditionStep | ListClickStep
@@ -103,6 +115,14 @@ export type SessionState = { serial: string; connected: boolean }
 
 export type DeviceRunStatus = 'pending' | 'running' | 'success' | 'partial' | 'failure' | 'cancelled'
 export type ListRow = { name: string; key: string; hasAction: boolean; hasCompleted: boolean; deferred?: boolean; error?: string }
+export type StateListRow = {
+  index: number
+  bounds: Bounds
+  status: 'pending' | 'completed' | 'missing' | 'ambiguous'
+  deferred?: boolean
+  error?: string
+}
+export type ListPreviewRow = ListRow | StateListRow
 export type MatchInfo = { bounds: Bounds; index: number }
 export type DeviceRun = { serial: string; status: DeviceRunStatus; stepIndex?: number; error?: string; runDir?: string }
 export type BatchRecord = {
@@ -125,7 +145,7 @@ export type AppApi = {
   snapshot(serial: string): Promise<HierarchySnapshot>
   count(serial: string, selector: Selector): Promise<number>
   inspectMatches(serial: string, selector: Selector): Promise<MatchInfo[]>
-  previewList(serial: string, step: ListClickStep): Promise<ListRow[]>
+  previewList(serial: string, step: ListClickStep): Promise<ListPreviewRow[]>
   saveTask(task: AutomationTask): Promise<string | null>
   loadTask(): Promise<AutomationTask | null>
   runTask(task: AutomationTask, serials: string[]): Promise<BatchRecord>

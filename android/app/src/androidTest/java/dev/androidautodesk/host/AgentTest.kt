@@ -29,7 +29,9 @@ class AgentTest {
 
     private val device by lazy { UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()) }
     private val locator by lazy { ElementLocator(device) }
+    private val inputs by lazy { InputOperations(locator) }
     private val lists by lazy { ListOperations(locator) }
+    private val stateRows by lazy { RowStateOperations(locator) }
     // 触摸/滚轮注入独立于 UiDevice 高层 API，见 TouchInjector 注释
     private val injector by lazy { TouchInjector(InstrumentationRegistry.getInstrumentation().uiAutomation) }
     private val token by lazy { InstrumentationRegistry.getArguments().getString("token") ?: error("缺少会话密钥") }
@@ -90,8 +92,8 @@ class AgentTest {
             }
             "count" -> countMatches(args.getJSONObject("selector"), args.optLong("waitMs", 0L))
             "inspectMatches" -> locator.inspect(args.getJSONObject("selector"))
-            "scanRows" -> lists.scan(args)
-            "tapRow" -> lists.tap(args)
+            "scanRows" -> if (args.optString("mode") == "rowState") stateRows.scan(args) else lists.scan(args)
+            "tapRow" -> if (args.optString("mode") == "rowState") stateRows.tap(args) else lists.tap(args)
             "scrollList" -> lists.scroll(args)
             "tap" -> {
                 if (args.has("selector") && !args.isNull("selector")) {
@@ -103,8 +105,7 @@ class AgentTest {
                 "ok"
             }
             "input" -> {
-                val target = locator.findUnique(args.getJSONObject("selector"), args.optLong("timeoutMs", 10000))
-                target.setText(args.getString("text"))
+                inputs.input(args.getJSONObject("selector"), args.getString("text"), args.optLong("timeoutMs", 10000))
                 "ok"
             }
             "swipe" -> {

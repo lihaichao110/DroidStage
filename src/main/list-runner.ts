@@ -3,6 +3,7 @@
  */
 import type { ListClickStep, ListRow } from '../shared/types'
 import type { DeviceSession } from './session'
+import { runRowStateClick } from './row-state-runner'
 
 export type ListResult = { success: number; skipped: number; alreadyDone: number }
 
@@ -21,6 +22,7 @@ export async function runListClick(
   checkCancelled: () => void,
   report: (name: string, reason: string) => Promise<void>
 ): Promise<ListResult> {
+  if (step.mode === 'rowState') return runRowStateClick(step, session, checkCancelled, report)
   const agent = session.agent()
   const seen = new Set<string>()
   const invalidSeen = new Set<string>()

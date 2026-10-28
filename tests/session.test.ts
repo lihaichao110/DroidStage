@@ -1,8 +1,19 @@
+/**
+ * 设备会话测试：验证启动服务的范围及控件快照请求复用。
+ */
 import { describe, expect, it, vi } from 'vitest'
-import type { AgentClient } from '../src/main/agent-client'
+import { EventEmitter } from 'node:events'
+import { AgentClient } from '../src/main/agent-client'
+import { adb, adbSpawn } from '../src/main/adb'
 import type { HierarchySnapshot } from '../src/shared/types'
 
-vi.mock('electron', () => ({ app: { getPath: () => '/tmp' } }))
+vi.mock('electron', () => ({ app: { getPath: () => '/tmp', getAppPath: () => '/app', isPackaged: false } }))
+vi.mock('node:fs', () => ({ existsSync: () => true }))
+vi.mock('../src/main/adb', () => ({
+  adb: vi.fn(), adbSpawn: vi.fn(),
+  listDevices: async () => [{ serial: 'test-serial', state: 'device' }],
+  onDevice: (serial: string, args: string[]) => ['-s', serial, ...args]
+}))
 import { DeviceSession } from '../src/main/session'
 
 // 合法最小层级 XML：单个根节点，bounds 决定快照推算出的屏幕宽高
@@ -18,6 +29,24 @@ function makeSession(request: RequestFn): DeviceSession {
 }
 
 describe('会话快照', () => {
+  it('正式会话仅启动代理服务，不执行 APK 内的模拟页面测试', async () => {
+    vi.mocked(adb).mockImplementation(async (args) => Buffer.from(
+      args.includes('getprop') ? '29' : args.includes('tcp:0') ? '45678' : 'Success'
+    ))
+    const child = { stdout: new EventEmitter(), stderr: new EventEmitter(), exitCode: null, kill: vi.fn() }
+    vi.mocked(adbSpawn).mockResolvedValue(child as unknown as Awaited<ReturnType<typeof adbSpawn>>)
+    const client = { request: vi.fn().mockResolvedValue('pong'), close: vi.fn() }
+    const connect = vi.spyOn(AgentClient, 'connect').mockResolvedValue(client as unknown as AgentClient)
+    try {
+      const session = await DeviceSession.open('test-serial')
+      const args = vi.mocked(adbSpawn).mock.calls.at(-1)![0]
+      expect(args.slice(args.indexOf('class') - 1, args.indexOf('class') + 2))
+        .toEqual(['-e', 'class', 'dev.androidautodesk.host.AgentTest#serve'])
+      await session.close()
+      expect(child.kill).toHaveBeenCalledOnce()
+    } finally { connect.mockRestore() }
+  })
+
   it('并发快照复用在途请求，只向手机端发送一次', async () => {
     let respond!: (xml: string) => void
     const request = vi.fn<RequestFn>(() => new Promise<string>((resolve) => { respond = resolve }))
