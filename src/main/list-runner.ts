@@ -2,7 +2,7 @@
  * 列表批量执行：逐屏扫描、按标识去重、逐行重查点击并确认末页。
  */
 import type { ListClickStep, ListRow } from '../shared/types'
-import type { DeviceSession } from './session'
+import type { DeviceSessionPort } from './session-port'
 import { runRowStateClick } from './row-state-runner'
 
 export type ListResult = { success: number; skipped: number; alreadyDone: number }
@@ -18,7 +18,7 @@ export type ListResult = { success: number; skipped: number; alreadyDone: number
  */
 export async function runListClick(
   step: ListClickStep,
-  session: DeviceSession,
+  session: DeviceSessionPort,
   checkCancelled: () => void,
   report: (name: string, reason: string) => Promise<void>
 ): Promise<ListResult> {

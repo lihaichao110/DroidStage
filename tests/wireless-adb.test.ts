@@ -1,12 +1,14 @@
 /**
  * 无线 ADB 输入测试：拒绝非法端点和配对码，并确认连接后设备确实在线。
  */
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 vi.mock('../src/main/adb', () => ({ adb: vi.fn(), listDevices: vi.fn() }))
 import { adb, listDevices } from '../src/main/adb'
-import { connectWireless, enableLegacyWireless, pairWireless, validateEndpoint } from '../src/main/wireless-adb'
+import { connectWireless, enableLegacyWireless, pairWireless, validateEndpoint, verifyLegacyWireless } from '../src/main/wireless-adb'
 
 describe('无线 ADB', () => {
+  beforeEach(() => vi.resetAllMocks())
+
   it('拒绝空端口、越界端口和命令参数', () => {
     expect(validateEndpoint(' 192.168.1.10:37123 ')).toBe('192.168.1.10:37123')
     expect(() => validateEndpoint('192.168.1.10:0')).toThrow()
@@ -15,7 +17,6 @@ describe('无线 ADB', () => {
   })
 
   it('配对码无效时不调用 ADB', async () => {
-    vi.mocked(adb).mockClear()
     await expect(pairWireless('192.168.1.10:37123', '123')).rejects.toThrow('6 位配对码')
     expect(adb).not.toHaveBeenCalled()
   })
@@ -27,19 +28,48 @@ describe('无线 ADB', () => {
   })
 
   it('旧版无线连接先校验 USB 授权和手机 IP', async () => {
-    vi.mocked(adb).mockClear()
     await expect(enableLegacyWireless('USB123', 'not-an-ip')).rejects.toThrow('IPv4')
     vi.mocked(listDevices).mockResolvedValue([{ serial: 'USB123', state: 'unauthorized', usb: true }])
     await expect(enableLegacyWireless('USB123', '192.168.1.10')).rejects.toThrow('允许调试授权')
     expect(adb).not.toHaveBeenCalled()
   })
 
-  it('旧版无线连接切换指定 USB 设备并确认新序列号在线', async () => {
-    vi.mocked(adb).mockClear().mockResolvedValueOnce(Buffer.from('29')).mockResolvedValueOnce(Buffer.from('restarting in TCP mode port: 5555')).mockResolvedValueOnce(Buffer.from('connected to 192.168.1.10:5555'))
-    vi.mocked(listDevices).mockResolvedValueOnce([{ serial: 'USB123', state: 'device', usb: true }]).mockResolvedValueOnce([{ serial: '192.168.1.10:5555', state: 'device', usb: false }])
+  it('旧版无线仅在 USB 阶段启用 TCP/IP，不提前宣称无线连接成功', async () => {
+    vi.mocked(adb).mockResolvedValueOnce(Buffer.from('29')).mockResolvedValueOnce(Buffer.from('restarting in TCP mode port: 5555'))
+    vi.mocked(listDevices).mockResolvedValueOnce([{ serial: 'USB123', state: 'device', usb: true }])
     await expect(enableLegacyWireless('USB123', '192.168.1.10')).resolves.toEqual({ serial: '192.168.1.10:5555', sdk: 29 })
     expect(adb).toHaveBeenNthCalledWith(1, ['-s', 'USB123', 'shell', 'getprop', 'ro.build.version.sdk'])
     expect(adb).toHaveBeenNthCalledWith(2, ['-s', 'USB123', 'tcpip', '5555'], 15000)
-    expect(adb).toHaveBeenNthCalledWith(3, ['connect', '192.168.1.10:5555'], 15000)
+    expect(adb).toHaveBeenCalledTimes(2)
+  })
+
+  it('拔线前拒绝验证无线连接', async () => {
+    vi.mocked(listDevices).mockResolvedValue([{ serial: 'USB123', state: 'device', usb: true }])
+    await expect(verifyLegacyWireless('USB123', '192.168.1.10:5555')).rejects.toThrow('先拔掉 USB')
+    expect(adb).not.toHaveBeenCalled()
+  })
+
+  it('拔线后确认无线设备在线', async () => {
+    vi.mocked(listDevices).mockResolvedValueOnce([]).mockResolvedValueOnce([{ serial: '192.168.1.10:5555', state: 'device', usb: false }])
+    vi.mocked(adb).mockResolvedValue(Buffer.from('connected to 192.168.1.10:5555'))
+    await expect(verifyLegacyWireless('USB123', '192.168.1.10:5555')).resolves.toBeUndefined()
+    expect(adb).toHaveBeenCalledWith(['connect', '192.168.1.10:5555'], 15000)
+  })
+
+  it('端口拒绝时提示重新插线启用调试', async () => {
+    vi.mocked(adb).mockRejectedValue(new Error('cannot connect: 由于目标计算机积极拒绝，无法连接。 (10061)'))
+    await expect(connectWireless('192.168.1.10:5555')).rejects.toThrow('请重新插入 USB')
+    expect(listDevices).not.toHaveBeenCalled()
+  })
+
+  it('ADB 将端口拒绝写在标准输出时仍提供恢复步骤', async () => {
+    vi.mocked(adb).mockResolvedValue(Buffer.from('cannot connect to 192.168.1.10:5555: 由于目标计算机积极拒绝，无法连接。 (10061)'))
+    await expect(connectWireless('192.168.1.10:5555')).rejects.toThrow('5555 端口未开放')
+  })
+
+  it('普通无线连接失败保留原始原因', async () => {
+    vi.mocked(adb).mockRejectedValue(new Error('网络不可达'))
+    await expect(connectWireless('192.168.1.10:5555')).rejects.toThrow('网络不可达')
+    await expect(connectWireless('192.168.1.10:37123')).rejects.toThrow('网络不可达')
   })
 })

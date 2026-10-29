@@ -13,10 +13,12 @@ export class AgentClient {
   private nextId = 1
   private pending = new Map<number, Pending>()
   private closed = false
+  private onEvent?: (event: Record<string, unknown>) => void
 
-  private constructor(socket: net.Socket, token: string) {
+  private constructor(socket: net.Socket, token: string, onEvent?: (event: Record<string, unknown>) => void) {
     this.socket = socket
     this.token = token
+    this.onEvent = onEvent
     socket.setEncoding('utf8')
     socket.on('data', (chunk: string) => this.receive(chunk))
     socket.on('error', (error) => this.failAll(error))
@@ -32,6 +34,11 @@ export class AgentClient {
         resolve(new AgentClient(socket, token))
       })
     })
+  }
+
+  /** 已验证 TLS 证书的 socket 可复用相同 JSON 行协议，事件另交给投屏通道。 */
+  static fromSocket(socket: net.Socket, token: string, onEvent?: (event: Record<string, unknown>) => void): AgentClient {
+    return new AgentClient(socket, token, onEvent)
   }
 
   request<T>(op: string, args: Record<string, unknown> = {}, timeoutMs = 15000): Promise<T> {
@@ -78,6 +85,11 @@ export class AgentClient {
       this.buffer = this.buffer.slice(breakAt + 1)
       try {
         const message = JSON.parse(line) as { id: number; ok: boolean; result?: unknown; error?: string }
+        if ('event' in message) {
+          this.onEvent?.(message as Record<string, unknown>)
+          breakAt = this.buffer.indexOf('\n')
+          continue
+        }
         const pending = this.pending.get(message.id)
         if (pending) {
           clearTimeout(pending.timer)

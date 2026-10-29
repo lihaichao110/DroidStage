@@ -32,7 +32,7 @@ const task: AutomationTask = { version: 1, name: '并行任务', steps: [
 ] }
 
 function registry(sessions: Record<string, DeviceSession>): DeviceRegistry {
-  return { require(serial: string) { const session = sessions[serial]; if (!session) throw new Error('未连接'); return session } } as DeviceRegistry
+  return { require(serial: string) { const session = sessions[serial]; if (!session) throw new Error('未连接'); return session } } as unknown as DeviceRegistry
 }
 
 async function waitFinished(batch: BatchCoordinator): Promise<void> {
@@ -77,6 +77,20 @@ describe('多设备批次', () => {
     const coordinator = new BatchCoordinator(registry({ one: session, two: session }), () => {})
     await expect(coordinator.start(task, ['one', 'two'])).rejects.toThrow('设备 two 已离线')
     expect(coordinator.state()).toBeNull()
+  })
+
+  it('纯手机端直连批次无需 ADB 也能执行', async () => {
+    vi.mocked(listDevices).mockClear()
+    vi.mocked(listDevices).mockRejectedValue(new Error('ADB 不可用'))
+    const request = vi.fn(async () => {})
+    const session = { agent: () => ({ request }) } as unknown as DeviceSession
+    const serial = 'direct:test-device'
+    const coordinator = new BatchCoordinator(registry({ [serial]: session }), () => {})
+    await coordinator.start(task, [serial])
+    await waitFinished(coordinator)
+    expect(coordinator.state()?.devices[0].status).toBe('success')
+    expect(request).toHaveBeenCalledTimes(2)
+    expect(listDevices).not.toHaveBeenCalled()
   })
 
   it('设备预检期间拒绝第二个批次', async () => {

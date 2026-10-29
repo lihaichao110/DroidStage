@@ -7,7 +7,7 @@ import { appendFile, mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import type { AutomationTask, BasicStep, ConditionStep, RunEvent } from '../shared/types'
 import { flowStepNumber, stepSummary, validateTask } from '../shared/task'
-import { DeviceSession } from './session'
+import type { DeviceSessionPort } from './session-port'
 import { runListClick } from './list-runner'
 import { listSummary } from './list-summary'
 
@@ -20,7 +20,7 @@ export class TaskRunner {
   cancel(): void { this.cancelled = true }
   isRunning(): boolean { return this.running }
 
-  async run(task: AutomationTask, session: DeviceSession, emit: (event: RunEvent) => void, context?: { batchId: string; serial: string; runDir: string }): Promise<void> {
+  async run(task: AutomationTask, session: DeviceSessionPort, emit: (event: RunEvent) => void, context?: { batchId: string; serial: string; runDir: string }): Promise<void> {
     if (this.running) throw new Error('已有任务在运行')
     validateTask(task)
     this.running = true
@@ -112,7 +112,7 @@ export class TaskRunner {
   /** 条件目标每轮只查一次；只有未命中且仍有机会时才执行不存在分支。 */
   private async executeCondition(
     step: ConditionStep,
-    session: DeviceSession,
+    session: DeviceSessionPort,
     runDir: string,
     index: number,
     number: number,
@@ -146,7 +146,7 @@ export class TaskRunner {
 
   /** 分支动作沿用普通动作执行规则，并把分支位置写进日志与失败信息。 */
   private async executeBranch(
-    actions: BasicStep[], label: string, session: DeviceSession, runDir: string, index: number, number: number, check: number,
+    actions: BasicStep[], label: string, session: DeviceSessionPort, runDir: string, index: number, number: number, check: number,
     roundLabel: string, screenshotPrefix: string,
     event: (kind: RunEvent['kind'], message: string, stepIndex?: number) => Promise<void>
   ): Promise<void> {
@@ -178,7 +178,7 @@ export class TaskRunner {
 
   private throwIfCancelled(): void { if (this.cancelled) throw new CancelledError() }
 
-  private async executeBasicStep(step: BasicStep, session: DeviceSession, runDir: string, screenshotName: string): Promise<void> {
+  private async executeBasicStep(step: BasicStep, session: DeviceSessionPort, runDir: string, screenshotName: string): Promise<void> {
     const agent = session.agent()
     switch (step.type) {
       case 'tap':

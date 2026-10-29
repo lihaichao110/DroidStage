@@ -36,10 +36,13 @@ export class BatchCoordinator {
     const previous = this.current
     for (const serial of targets) this.startingTargets.add(serial)
     try {
-      const online = new Set((await listDevices()).filter((device) => device.state === 'device').map((device) => device.serial))
+      // 手机端直连在拔线后不会出现在 ADB 列表，且没有安装 ADB 时也应能独立运行。
+      const adbTargets = targets.filter((serial) => !serial.startsWith('direct:'))
+      const online = new Set((adbTargets.length ? await listDevices() : [])
+        .filter((device) => device.state === 'device').map((device) => device.serial))
       for (const serial of targets) {
         this.devices.require(serial)
-        if (!online.has(serial)) throw new Error(`设备 ${serial} 已离线，请刷新设备列表`)
+        if (!serial.startsWith('direct:') && !online.has(serial)) throw new Error(`设备 ${serial} 已离线，请刷新设备列表`)
       }
 
       const id = `batch-${new Date().toISOString().replace(/[:.]/g, '-')}-${randomUUID().slice(0, 8)}`

@@ -6,9 +6,13 @@ import type { AppApi, AutomationTask, ListClickStep, MirrorStatus, RunEvent, Scr
 
 const api: AppApi = {
   listDevices: () => ipcRenderer.invoke('devices:list'),
+  installCompanion: (serial: string) => ipcRenderer.invoke('devices:install-companion', serial),
+  pairCompanion: (serial: string, ip: string) => ipcRenderer.invoke('devices:pair-companion', serial, ip),
+  updateCompanionIp: (serial: string, ip: string) => ipcRenderer.invoke('devices:update-companion-ip', serial, ip),
   pairWireless: (address: string, code: string) => ipcRenderer.invoke('devices:pair-wireless', address, code),
   connectWireless: (address: string) => ipcRenderer.invoke('devices:connect-wireless', address),
   enableLegacyWireless: (serial: string, ip: string) => ipcRenderer.invoke('devices:legacy-wireless', serial, ip),
+  verifyLegacyWireless: (serial: string, address: string) => ipcRenderer.invoke('devices:verify-legacy-wireless', serial, address),
   connect: (serial: string) => ipcRenderer.invoke('device:connect', serial),
   disconnect: (serial: string) => ipcRenderer.invoke('device:disconnect', serial),
   sessionStates: () => ipcRenderer.invoke('device:states'),

@@ -2,7 +2,7 @@
  * 无身份列表执行：按行状态点击，用画面指纹避免对滚动重叠中的失败行复点。
  */
 import type { ListClickStep, StateListRow } from '../shared/types'
-import type { DeviceSession } from './session'
+import type { DeviceSessionPort } from './session-port'
 import type { ListResult } from './list-runner'
 import { overlapShift, rowFingerprints } from './row-fingerprint'
 
@@ -22,7 +22,7 @@ const ROW_LOAD_POLL_MS = 200 // 只对空列表短轮询，避免把加载动画
  */
 export async function runRowStateClick(
   step: StateStep,
-  session: DeviceSession,
+  session: DeviceSessionPort,
   checkCancelled: () => void,
   report: (name: string, reason: string) => Promise<void>
 ): Promise<ListResult> {

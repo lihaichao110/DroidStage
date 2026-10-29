@@ -35,18 +35,33 @@ export async function pairWireless(address: string, code: string): Promise<void>
 /** 连接已配对设备，并确认它出现在 ADB 在线设备列表。 */
 export async function connectWireless(address: string): Promise<void> {
   const endpoint = validateEndpoint(address)
-  const output = (await adb(['connect', endpoint], 15000)).toString('utf8')
-  if (!/connected to/i.test(output)) throw new Error(output.trim() || '无线设备连接失败')
+  let output: string
+  try {
+    output = (await adb(['connect', endpoint], 15000)).toString('utf8')
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error)
+    throw wirelessConnectionError(endpoint, reason)
+  }
+  if (!/connected to/i.test(output)) throw wirelessConnectionError(endpoint, output.trim() || '无线设备连接失败')
   const device = (await listDevices()).find((item) => item.serial === endpoint)
   if (!device || device.state !== 'device') throw new Error(`无线设备 ${endpoint} 未就绪，请检查无线调试与网络`)
 }
 
+/** 将端口拒绝错误转换为可操作提示，其余 ADB 错误保持原始原因。 */
+function wirelessConnectionError(endpoint: string, reason: string): Error {
+  // 连接被拒绝表示目标端口未接受连接；继续重试 adb connect 无法开启手机端监听。
+  if (endpoint.endsWith(`:${LEGACY_PORT}`) && /10061|ECONNREFUSED|connection refused|actively refused|积极拒绝|连接被拒绝/i.test(reason)) {
+    return new Error(`手机 ${endpoint} 的 5555 端口未开放或拒绝连接。请重新插入 USB，点击“1. 启用无线调试”，拔线后再验证；若手机每次拔线都关闭端口，请使用 USB 连接。原始错误：${reason}`)
+  }
+  return new Error(reason)
+}
+
 /**
- * 用已授权的 USB 设备启用旧版 ADB TCP/IP，并确认无线序列号在线。
+ * 用已授权的 USB 设备启用旧版 ADB TCP/IP；实际无线连接须在拔线后验证。
  * @param serial 当前 USB 序列号
  * @param ip 手机在局域网中的 IP 地址
  * @returns 无线序列号及设备实际 Android API 等级
- * @throws USB 未授权、IP 无效或无线连接失败时抛出
+ * @throws USB 未授权、IP 无效或 ADB 模式切换失败时抛出
  */
 export async function enableLegacyWireless(serial: string, ip: string): Promise<{ serial: string; sdk: number }> {
   const address = validateLegacyIp(ip)
@@ -56,14 +71,20 @@ export async function enableLegacyWireless(serial: string, ip: string): Promise<
   if (!Number.isInteger(sdk) || sdk < 1) throw new Error('无法读取手机的 Android API 等级')
   const endpoint = `${address}:${LEGACY_PORT}`
   await adb(['-s', serial, 'tcpip', String(LEGACY_PORT)], 15000)
-  // adbd 切换到 TCP/IP 时会重启，立即 connect 可能被拒绝；只重试连接，不重复切换。
-  let failure: unknown
-  for (let attempt = 0; attempt < 8; attempt++) {
-    if (attempt) await new Promise((resolve) => setTimeout(resolve, 1000))
-    try {
-      await connectWireless(endpoint)
-      return { serial: endpoint, sdk }
-    } catch (error) { failure = error }
+  return { serial: endpoint, sdk }
+}
+
+/**
+ * 拔线后确认 USB 传输已消失，再验证旧版无线 ADB 端点。
+ * @param usbSerial 启用 TCP/IP 时使用的 USB 序列号
+ * @param address 预期的 IP:5555 端点
+ * @throws USB 仍在线、端点无效或无线连接失败时抛出
+ */
+export async function verifyLegacyWireless(usbSerial: string, address: string): Promise<void> {
+  const endpoint = validateEndpoint(address)
+  if (!endpoint.endsWith(`:${LEGACY_PORT}`)) throw new Error('旧版无线调试端口必须是 5555')
+  if ((await listDevices()).some((device) => device.serial === usbSerial && device.usb)) {
+    throw new Error('请先拔掉 USB 数据线，再验证无线连接')
   }
-  throw new Error(`USB 已切换为无线调试，但连接 ${endpoint} 失败：${failure instanceof Error ? failure.message : String(failure)}`)
+  await connectWireless(endpoint)
 }

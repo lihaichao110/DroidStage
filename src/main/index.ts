@@ -4,11 +4,13 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import { listDevices } from './adb'
+import { existsSync } from 'node:fs'
+import { adb, listDevices, onDevice } from './adb'
+import { pairCompanion } from './companion-client'
 import { DeviceRegistry } from './device-registry'
 import { BatchCoordinator } from './batch-coordinator'
 import { MirrorRegistry } from './mirror-registry'
-import { connectWireless, enableLegacyWireless, pairWireless, validateLegacyIp } from './wireless-adb'
+import { connectWireless, enableLegacyWireless, pairWireless, validateLegacyIp, verifyLegacyWireless } from './wireless-adb'
 import { validateSelector, validateTask } from '../shared/task'
 import { controlScroll, controlTouchEvents } from '../shared/touch'
 import { AKEYCODE_HOME, encodeBackClick, encodeKeyClick, encodeScrollEvent, encodeTouchEvent } from '../shared/utils/scrcpy-control-msg'
@@ -52,9 +54,36 @@ function createWindow(): void {
 
 app.whenReady().then(() => {
   createWindow()
-  ipcMain.handle('devices:list', () => listDevices())
+  ipcMain.handle('devices:list', async () => {
+    // 手机端直连在 ADB 未安装或不可用时仍须显示；USB 发现失败不应挡住已配对设备。
+    const [adbDevices, paired] = await Promise.all([listDevices().catch(() => []), devices.companions.list()])
+    return [...adbDevices, ...paired.map((item) => ({
+      serial: item.serial, model: item.model, state: 'paired', usb: false, transport: 'companion' as const, ip: item.ip
+    }))]
+  })
+  ipcMain.handle('devices:install-companion', async (_event, serial: string) => {
+    const usb = (await listDevices()).find((item) => item.serial === serial && item.usb && item.state === 'device')
+    if (!usb) throw new Error('请先用 USB 连接并授权手机')
+    const root = app.isPackaged ? path.join(process.resourcesPath, 'agent') : path.join(app.getAppPath(), 'assets', 'agent')
+    const apk = path.join(root, 'host.apk')
+    if (!existsSync(apk)) throw new Error('缺少手机端安装包，请先运行 stage:agent')
+    const output = (await adb(onDevice(serial, ['install', '-r', apk]), 60000)).toString('utf8')
+    if (!output.includes('Success')) throw new Error(output.trim() || '手机端安装失败')
+    await adb(onDevice(serial, ['shell', 'am', 'start', '-n', 'dev.androidautodesk.host/.CompanionActivity']))
+  })
+  ipcMain.handle('devices:pair-companion', async (_event, serial: string, ip: string) => {
+    const usb = (await listDevices()).find((item) => item.serial === serial && item.usb && item.state === 'device')
+    if (!usb) throw new Error('首次配对需要 USB 连接')
+    return pairCompanion(serial, ip, devices.companions)
+  })
+  ipcMain.handle('devices:update-companion-ip', async (_event, serial: string, ip: string) => {
+    validateLegacyIp(ip)
+    const item = await devices.companions.get(serial)
+    await devices.companions.save({ ...item, ip })
+  })
   ipcMain.handle('devices:pair-wireless', (_event, address: string, code: string) => pairWireless(address, code))
   ipcMain.handle('devices:connect-wireless', (_event, address: string) => connectWireless(address))
+  ipcMain.handle('devices:verify-legacy-wireless', (_event, serial: string, address: string) => verifyLegacyWireless(serial, address))
   ipcMain.handle('devices:legacy-wireless', async (_event, serial: string, ip: string) => {
     if (batches.isRunning(serial)) throw new Error('该设备正在运行任务，不能切换无线连接')
     validateLegacyIp(ip)
@@ -66,6 +95,7 @@ app.whenReady().then(() => {
   })
   ipcMain.handle('device:connect', async (_event, serial: string) => {
     if (batches.isRunning(serial)) throw new Error('该设备正在运行任务，不能重新连接')
+    await mirrors.stop(serial)
     await devices.connect(serial)
   })
   ipcMain.handle('device:disconnect', async (_event, serial: string) => {
@@ -99,21 +129,24 @@ app.whenReady().then(() => {
     if (!window) throw new Error('窗口未就绪')
     devices.require(serial)
     if (quality !== 'editor' && quality !== 'wall') throw new Error('未知投屏模式')
-    await mirrors.start(window, serial, quality)
+    await mirrors.start(window, serial, quality, serial.startsWith('direct:') ? devices.requireCompanion(serial) : undefined)
   })
   ipcMain.handle('mirror:stop', (_event, serial: string) => mirrors.stop(serial))
   // 手动操控三类输入统一编码为 scrcpy 控制消息直写控制通道（即发即弃），任务运行中禁止干预
   ipcMain.handle('mirror:touch', (_event, serial: string, input: TouchInput) => {
     if (batches.isRunning(serial)) throw new Error('任务运行中不能手动操控该设备')
+    if (serial.startsWith('direct:')) return mirrors.touch(serial, input)
     for (const touch of controlTouchEvents(input)) mirrors.sendControl(serial, encodeTouchEvent(touch))
   })
   ipcMain.handle('mirror:scroll', (_event, serial: string, input: ScrollInput) => {
     if (batches.isRunning(serial)) throw new Error('任务运行中不能手动操控该设备')
+    if (serial.startsWith('direct:')) return mirrors.scroll(serial, input)
     mirrors.sendControl(serial, encodeScrollEvent(controlScroll(input)))
   })
   ipcMain.handle('device:key', (_event, serial: string, key: 'back' | 'home') => {
     if (key !== 'back' && key !== 'home') throw new Error('未知按键')
     if (batches.isRunning(serial)) throw new Error('任务运行中不能手动操控该设备')
+    if (serial.startsWith('direct:')) return mirrors.key(serial, key)
     // back 走 BACK_OR_SCREEN_ON：息屏时 server 自动转为电源键，右键即具备唤醒能力
     for (const message of key === 'back' ? encodeBackClick() : encodeKeyClick(AKEYCODE_HOME)) mirrors.sendControl(serial, message)
   })

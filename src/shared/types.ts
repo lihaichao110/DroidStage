@@ -63,7 +63,7 @@ export type AutomationTask = {
   steps: Step[]
 }
 
-export type Device = { serial: string; state: string; model?: string; usb: boolean }
+export type Device = { serial: string; state: string; model?: string; usb: boolean; transport?: 'companion'; ip?: string }
 
 export type UiNode = {
   id: string
@@ -136,9 +136,13 @@ export type BatchRecord = {
 
 export type AppApi = {
   listDevices(): Promise<Device[]>
+  installCompanion(serial: string): Promise<void>
+  pairCompanion(serial: string, ip: string): Promise<{ serial: string; model: string; ip: string }>
+  updateCompanionIp(serial: string, ip: string): Promise<void>
   pairWireless(address: string, code: string): Promise<void>
   connectWireless(address: string): Promise<void>
   enableLegacyWireless(serial: string, ip: string): Promise<{ serial: string; sdk: number }>
+  verifyLegacyWireless(serial: string, address: string): Promise<void>
   connect(serial: string): Promise<void>
   disconnect(serial: string): Promise<void>
   sessionStates(): Promise<SessionState[]>

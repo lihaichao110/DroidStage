@@ -29,6 +29,7 @@ android {
 }
 
 dependencies {
+    implementation("org.bouncycastle:bcpkix-jdk15to18:1.83")
     androidTestImplementation("androidx.test:runner:1.7.0")
     androidTestImplementation("androidx.test.ext:junit:1.3.0")
     androidTestImplementation("androidx.test.uiautomator:uiautomator:2.4.0")
