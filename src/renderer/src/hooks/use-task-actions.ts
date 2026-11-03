@@ -2,7 +2,7 @@
  * 任务文件与运行操作：集中处理校验、保存取消和执行状态。
  */
 import type { Dispatch, SetStateAction } from 'react'
-import type { AutomationTask, BatchRecord } from '../../../shared/types'
+import type { AutomationTask, BatchSummary } from '../../../shared/types'
 import { validateTask } from '../../../shared/task'
 
 type TaskActionsState = {
@@ -12,7 +12,7 @@ type TaskActionsState = {
   setMessage: (message: string) => void
   onTaskLoaded: () => void
   targets: string[]
-  onBatchStarted: (batch: BatchRecord) => void
+  onBatchStarted: (batch: BatchSummary) => void
 }
 
 /**

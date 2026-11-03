@@ -25,7 +25,8 @@ const api: AppApi = {
   runTask: (task: AutomationTask, serials: string[]) => ipcRenderer.invoke('task:run', task, serials),
   cancelRun: (serial?: string) => ipcRenderer.invoke('task:cancel', serial),
   batchState: () => ipcRenderer.invoke('batch:state'),
-  listBatches: () => ipcRenderer.invoke('batch:list'),
+  listBatches: (page: number) => ipcRenderer.invoke('batch:list', page),
+  batchEvents: (batchId: string, serial: string) => ipcRenderer.invoke('batch:events', batchId, serial),
   openRunDir: (directory: string) => ipcRenderer.invoke('run:open-dir', directory),
   onRunEvent: (listener: (event: RunEvent) => void) => {
     const handler = (_event: Electron.IpcRendererEvent, item: RunEvent): void => listener(item)

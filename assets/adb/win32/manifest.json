@@ -1,0 +1,245 @@
+{
+  "aospRevision": "9084198a2d4b0f6a0f174260fb42da33485b684d",
+  "files": [
+    {
+      "name": "adb.exe",
+      "sha256": "48408d77a65b482ea01ddb263201ee3c7f2adcefcc1a2187875e9f5b782247d3"
+    },
+    {
+      "name": "AdbWinApi.dll",
+      "sha256": "91970ad913202e1d418af44eb33017f608a55c3e66b629a439e931b3177e9603"
+    },
+    {
+      "name": "AdbWinUsbApi.dll",
+      "sha256": "394315a0a1d00cb0c6a175a53a4b569b58301c20c9cfd09850555ecf0bb18df9"
+    },
+    {
+      "name": "libabsl_base-2605.0.0.dll",
+      "sha256": "7e1b543f7a85f55f306dcb0c8f3f946a0591ad5e010ffe8d646ff86774dbfe32"
+    },
+    {
+      "name": "libabsl_city-2605.0.0.dll",
+      "sha256": "9718a211f2ccbc7594589809460f3cd15f32321f19a4c7aefcd39cfb584dbcb5"
+    },
+    {
+      "name": "libabsl_cord-2605.0.0.dll",
+      "sha256": "44441a02302568bab8db68a25903c49be45b88e0b9c18e402688a70084b0d45f"
+    },
+    {
+      "name": "libabsl_cordz_handle-2605.0.0.dll",
+      "sha256": "9095f21a8dda47e7a0c00aeac03af4f9f2dd9817a100cad0313f42d5bfb46f83"
+    },
+    {
+      "name": "libabsl_cordz_info-2605.0.0.dll",
+      "sha256": "24af64f37ccd23ffd0e406e1214bc4a288a4f922ebf4cfe5cd8dd1809d797378"
+    },
+    {
+      "name": "libabsl_cord_internal-2605.0.0.dll",
+      "sha256": "68da758db83a13b7dd7b32bb06e9cc3a6be5bffd333ea0bebe6ffbb2f4433231"
+    },
+    {
+      "name": "libabsl_crc32c-2605.0.0.dll",
+      "sha256": "e96dbcdd51ec7f03b3e1356e8dfaaa2e1129ec68729c0e8e0b6cb7a49f8d75c2"
+    },
+    {
+      "name": "libabsl_crc_cord_state-2605.0.0.dll",
+      "sha256": "05fe695586f3d12ac3df54a00afc6b5533d6bdf071774d0b48487fa840faeeae"
+    },
+    {
+      "name": "libabsl_crc_internal-2605.0.0.dll",
+      "sha256": "cc73a62554bb31b1b76d9c1203dd920553bcbfd0ca16a0928d9f292b0c381729"
+    },
+    {
+      "name": "libabsl_die_if_null-2605.0.0.dll",
+      "sha256": "ada899556a06ed78321aa151d8c2fd7ab54ee06e8895cb5e2e03f66bc9607f43"
+    },
+    {
+      "name": "libabsl_examine_stack-2605.0.0.dll",
+      "sha256": "02da77fa7fc3d2f64a71900f61a76ef5788370b67d98c7ffef23775cbd45d710"
+    },
+    {
+      "name": "libabsl_hash-2605.0.0.dll",
+      "sha256": "a3763280b9da795297ad2145b9d259956e4ebf62117503fcb95109f804d9bb05"
+    },
+    {
+      "name": "libabsl_hashtablez_sampler-2605.0.0.dll",
+      "sha256": "4c7d22b88056488970baecdd3ce3744bbee82e914fd9782ac490a05323b6e776"
+    },
+    {
+      "name": "libabsl_int128-2605.0.0.dll",
+      "sha256": "cb207648340f805ec41debe9f0e672f2337d682cbd8330435897649fff1d2f36"
+    },
+    {
+      "name": "libabsl_kernel_timeout_internal-2605.0.0.dll",
+      "sha256": "3759adce22265676d36d9db167422c4c52dcd5e508396ecf0519a2617a20221f"
+    },
+    {
+      "name": "libabsl_leak_check-2605.0.0.dll",
+      "sha256": "5626986d2bd3a33eec0ce4999472781be2071e07f3da6188623f5bf295cea76a"
+    },
+    {
+      "name": "libabsl_log_globals-2605.0.0.dll",
+      "sha256": "93bd93761dc8cdeb4f1ac87cb1e8c831fd1a3f0b0f00b55a31511589f2f4b697"
+    },
+    {
+      "name": "libabsl_log_internal_check_op-2605.0.0.dll",
+      "sha256": "514eaf51bc02968fab6968db4f60621bb38fd3cef0256bd73d9aa864ead3a6e1"
+    },
+    {
+      "name": "libabsl_log_internal_conditions-2605.0.0.dll",
+      "sha256": "61c63d87f19b48ba41213e8316462c34b98a9d2fc10abbcadf96a9bc83baae36"
+    },
+    {
+      "name": "libabsl_log_internal_fnmatch-2605.0.0.dll",
+      "sha256": "6fd7132073c1b185ce5b77d247bc6a23174abb5e1688d63c0087fd5df1f6ba1c"
+    },
+    {
+      "name": "libabsl_log_internal_format-2605.0.0.dll",
+      "sha256": "31219567dd30a5da339055c74806638b5fe4adfe13fd2f574234508c933eec1a"
+    },
+    {
+      "name": "libabsl_log_internal_globals-2605.0.0.dll",
+      "sha256": "2dd9ead936904d3fc2a50f88f45e58a5384b43a4fc6dfbff0a0f8bb36a31fbe6"
+    },
+    {
+      "name": "libabsl_log_internal_log_sink_set-2605.0.0.dll",
+      "sha256": "4eecadc53588cd6d248f1d37a40014cec9bab4d247cae39f6dc97e56696ef1fc"
+    },
+    {
+      "name": "libabsl_log_internal_message-2605.0.0.dll",
+      "sha256": "cf6dec4f4f8fbfa17c8510f1cd91c18d6de21718e286f29a250abc30f4ecee97"
+    },
+    {
+      "name": "libabsl_log_internal_nullguard-2605.0.0.dll",
+      "sha256": "c34a93356d64ddf2d97b4ff9630fdd08087148c1f2dadd87d2f2896b3c18f1bd"
+    },
+    {
+      "name": "libabsl_log_internal_proto-2605.0.0.dll",
+      "sha256": "ca24b815735203ff66a91c13ce78ed88e531aeb16c408fe3ece80b0adb6a0ea8"
+    },
+    {
+      "name": "libabsl_log_internal_structured_proto-2605.0.0.dll",
+      "sha256": "b24834c6cc768cecb7cef45f1287f64cdae16ec2700bb73a7dd4edd44b04c1c1"
+    },
+    {
+      "name": "libabsl_log_sink-2605.0.0.dll",
+      "sha256": "3860fe98229fc18aa484882701c4dd8cd39858ff476e016886481850bc3b7ee3"
+    },
+    {
+      "name": "libabsl_malloc_internal-2605.0.0.dll",
+      "sha256": "58838b5a0468cb811f31f81cf378670f854023b5e13da8fe838f88446bd651f4"
+    },
+    {
+      "name": "libabsl_raw_hash_set-2605.0.0.dll",
+      "sha256": "b5272ba1d1def6abe4fe8ab45a13b2bf0328fe061184137a747854180378556d"
+    },
+    {
+      "name": "libabsl_raw_logging_internal-2605.0.0.dll",
+      "sha256": "796a40a37acb93e1d411bb0f7bb6ca617e48b28549470b91878eab0d65824321"
+    },
+    {
+      "name": "libabsl_spinlock_wait-2605.0.0.dll",
+      "sha256": "a9ef96021896a6a1779c4377ab8fa98bcf3fb6320e3602fa09f0c56c9a145723"
+    },
+    {
+      "name": "libabsl_stacktrace-2605.0.0.dll",
+      "sha256": "369d0c8d5bb88501e597d0b58e0c6fb436c91fd064fe8cc9e23036e33ed81979"
+    },
+    {
+      "name": "libabsl_status-2605.0.0.dll",
+      "sha256": "cfb3b6fbcc09c9d5d4767d83c2fe26f319492045ff67b26c12d818bbf55cf221"
+    },
+    {
+      "name": "libabsl_statusor-2605.0.0.dll",
+      "sha256": "858419b5c2c92763aa927d70ff9d74330b2101212ffb524faa8ce3c45abedbff"
+    },
+    {
+      "name": "libabsl_strerror-2605.0.0.dll",
+      "sha256": "aa398235c4c34e31d6e9457caff621dbc531e664dce6ed1fa4d2be52eebc3bbe"
+    },
+    {
+      "name": "libabsl_strings-2605.0.0.dll",
+      "sha256": "a438451a21067c4b97ba9f8619112b3e32a272c9b2f49caea8ce4ce7ebdea67c"
+    },
+    {
+      "name": "libabsl_strings_internal-2605.0.0.dll",
+      "sha256": "389863c49aa80ae44d1c927bbb9fb874ecb12822dbc9376c758500d2e3e2e8e1"
+    },
+    {
+      "name": "libabsl_str_format_internal-2605.0.0.dll",
+      "sha256": "35ab00a300ab4d6bb412b393709e2b01d07b05c0e06bbaaedf2222afa896f580"
+    },
+    {
+      "name": "libabsl_symbolize-2605.0.0.dll",
+      "sha256": "da74b46b066b35de8ad1ab02368c196856625b3ef849bfe480434e9f01804b82"
+    },
+    {
+      "name": "libabsl_synchronization-2605.0.0.dll",
+      "sha256": "d9e574efd32a950155b6ccb0be941ed6a77446d215c971f9800bb8ee04184fa3"
+    },
+    {
+      "name": "libabsl_throw_delegate-2605.0.0.dll",
+      "sha256": "6df0849d600e2be985c6d21c2dc1dbbf4b134445b746b0e42daf6301baf46efe"
+    },
+    {
+      "name": "libabsl_time-2605.0.0.dll",
+      "sha256": "af82ba2e240b534d825b76037d0fc67e8bc78a82b1df29c867c42ae2a7e5f37d"
+    },
+    {
+      "name": "libabsl_time_zone-2605.0.0.dll",
+      "sha256": "de631f028e5ba9ed3eead6dae99fe5f53f61befdd233210c80fd1781eba33ae7"
+    },
+    {
+      "name": "libabsl_tracing_internal-2605.0.0.dll",
+      "sha256": "de372c5b319faf1cac655a958b337f2a5b7b4e0cddaba5b5cc595f11c8d70d6e"
+    },
+    {
+      "name": "libabsl_vlog_config_internal-2605.0.0.dll",
+      "sha256": "6eb1e30cb2e2226295bf806aa3b9b9e56aa90082c61b6958dbc161d7a5aaa3bf"
+    },
+    {
+      "name": "libbrotlicommon.dll",
+      "sha256": "7b0047dc16dd92a7932124dfd5a6e698d342f533a15d37d61f710def66091436"
+    },
+    {
+      "name": "libbrotlidec.dll",
+      "sha256": "c4c987a01597ddf969d93023f933f999a20f285588b0decb4deeb780c9e9cdf8"
+    },
+    {
+      "name": "libbrotlienc.dll",
+      "sha256": "03f9a82d293caf5b4065a9641dd5309e27aefc5c8111eeec25f906e47ec6c934"
+    },
+    {
+      "name": "libgcc_s_seh-1.dll",
+      "sha256": "791ebf66e99c7c1b4ed3666468cec45a0172b4c8942ac6c84c3e9cab3e1b5270"
+    },
+    {
+      "name": "liblz4.dll",
+      "sha256": "5e83fd34144fa033c12e22718317ec2123f8a3460903932b0bfddb8aad379cfd"
+    },
+    {
+      "name": "libprotobuf.dll",
+      "sha256": "39565f729595e1391a27684fb7c4c1d37e7082d1028c0db0c3b93bb42fbbf438"
+    },
+    {
+      "name": "libstdc++-6.dll",
+      "sha256": "4e4822dc4aaa99383f581dae7ab9464ae89346c5ca742f7efbcdebe20b0fe7b5"
+    },
+    {
+      "name": "libutf8_validity.dll",
+      "sha256": "1aa576b1a19bf5764d681dac34dfe49c1ae9e9324c46006fc865939599c8edc9"
+    },
+    {
+      "name": "libwinpthread-1.dll",
+      "sha256": "ee4f503512b09d7e2668518c41d6c176755a354523ae15aa4d36220c9cb31791"
+    },
+    {
+      "name": "libzstd.dll",
+      "sha256": "48368ab0ca622d0ec12f41ce85d91f22866bf5da92c77a69a06483564c93816c"
+    },
+    {
+      "name": "zlib1.dll",
+      "sha256": "8ae7aeb0467763a1e271cd831ca8e2f7fd101602adb9923100ea26c6be2a559b"
+    }
+  ]
+}

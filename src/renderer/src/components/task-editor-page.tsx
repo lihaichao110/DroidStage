@@ -2,7 +2,7 @@
  * 任务编辑页：保留单台设备拾取与三栏编辑，运行目标由设备管理页独立选择。
  */
 import { useEffect, useRef, useState } from 'react'
-import type { AutomationTask, BatchRecord, Device, HierarchySnapshot, Point, Selector, Step, UiNode } from '../../../shared/types'
+import type { AutomationTask, BatchSummary, Device, HierarchySnapshot, Point, Selector, Step, UiNode } from '../../../shared/types'
 import { suggestedSelector } from '../../../shared/task'
 import { InspectorPanel } from './inspector-panel'
 import { WorkflowPanel } from './workflow-panel'
@@ -25,7 +25,7 @@ type TaskEditorPageProps = {
   setFocused: (serial: string) => void
   setMessage: (message: string) => void
   onShowDevices: () => void
-  onBatchStarted: (batch: BatchRecord) => void
+  onBatchStarted: (batch: BatchSummary) => void
 }
 
 export function TaskEditorPage({ active, devices, connectedSerials, focused, targets, running, setFocused, setMessage, onShowDevices, onBatchStarted }: TaskEditorPageProps) {

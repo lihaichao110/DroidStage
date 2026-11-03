@@ -20,56 +20,15 @@ Google 官网下载的 Platform-Tools（SDK 组件）受《Android SDK 许可协
 
 另需 `assets/adb/NOTICE`（AOSP Apache 2.0 声明，已存在）与 `assets/adb/THIRD_PARTY_NOTICES`（第三方依赖许可清单，登记时由脚本复制）。`manifest.json` 由登记脚本生成，记录 40 位 AOSP 修订号与每个文件的 SHA-256。
 
-## 构建环境
+## Windows x64 本次已验证的构建路线
 
-- Linux x86_64 主机（Ubuntu 22.04+），或 Windows 上的 WSL2 Ubuntu
-- 内存 ≥ 16GB，空闲磁盘 ≥ 250GB（AOSP 源码 + 编译产物）
-- 官方环境要求以所选分支的文档为准：<https://source.android.com/docs/setup/start/requirements>
+本项目当前 Windows 包中的 `adb.exe` 是在 Windows 的 MSYS2 UCRT64 环境中，从 [nmeum/android-tools 37.0.0 源码包](https://github.com/nmeum/android-tools/releases/tag/37.0.0)本地编译的。该源码包汇集并修补 AOSP 源码，避免同步整个 Android 系统。源码包 SHA-256 为 `2725d09f892a3a38e534429f47a321f58ecf6a3169caa42c915fb2cb7d46be0e`；其中 ADB 对应的 [AOSP `android-17.0.0_r1` 修订号](https://android.googlesource.com/platform/packages/modules/adb/+/refs/tags/android-17.0.0_r1)为 `9084198a2d4b0f6a0f174260fb42da33485b684d`，已写入 `manifest.json`。
 
-macOS 版 ADB 需在对应架构的 Mac 上构建（Apple Silicon 机型可同时产出 x64/arm64 的 universal 二进制，取决于所选 AOSP 分支的 host 工具链支持）。
+构建使用 MSYS2 UCRT64 的 GCC、CMake、Ninja 和所需开发库，并对源码包应用 Windows 编译兼容补丁。构建产物位于 CMake 输出的 `vendor/adb.exe`。发行目录须同时收集 `AdbWinApi.dll`、`AdbWinUsbApi.dll` 和此可执行文件实际引用的 UCRT64 运行时 DLL；仅有 `adb.exe` 无法在干净的目标电脑启动。可以用 `objdump -p adb.exe` 逐层检查导入表，确认所有非系统 DLL 都在同一目录。
 
-## 构建步骤（Windows 版 ADB）
+收集完成后，用系统目录作为唯一 `PATH` 运行发行目录的 `adb.exe version` 和 `adb.exe devices -l`，确保没有借用构建机上的 MSYS2 DLL。`npm run dist:win` 还会自动检查包内文件哈希，并以同样方式启动包内 ADB。MSYS2 工具链只用于**构建机**，不要求最终用户安装。
 
-Windows 版 `adb.exe` 在 Linux 上通过 AOSP 的 MinGW 交叉编译产出，**不要在 Windows 上直接构建**。
-
-```bash
-# 1. 安装 repo 与编译依赖
-sudo apt-get install git-core gnupg flex bison build-essential zip curl \
-  zlib1g-dev libc6-dev-i386 libncurses5 lib32ncurses5-dev x11proto-core-dev \
-  libx11-dev lib32z1-dev libgl1-mesa-dev libxml2-utils xsltproc unzip
-mkdir -p ~/bin && curl https://storage.googleapis.com/git-repo-downloads/repo > ~/bin/repo
-chmod +x ~/bin/repo
-
-# 2. 选一个固定的 release tag（不要用滚动分支）
-#    完整列表：https://android.googlesource.com/platform/manifest/+refs/tags
-#    国内网络可改用 TUNA 镜像：https://mirrors.tuna.tsinghua.edu.cn/help/AOSP/
-mkdir aosp && cd aosp
-repo init -u https://android.googlesource.com/platform/manifest -b android-15.0.0_r1 --depth=1 -c
-repo sync -j8
-
-# 3. 记录本次构建的 AOSP 修订号（40 位，登记脚本需要）
-git -C .repo/manifests rev-parse HEAD
-
-# 4. 构建 Windows 版 ADB
-source build/envsetup.sh
-lunch sdk-eng
-m win_sdk
-
-# 5. 收集产物（路径以实际输出为准，不同分支可能有差异）
-ls out/host/windows-x86/bin/adb.exe
-ls out/host/windows-x86/bin/AdbWinApi.dll out/host/windows-x86/bin/AdbWinUsbApi.dll
-```
-
-> 注：`lunch` 目标与产物路径随 AOSP 分支演进可能变化，构建前请先查阅所选分支对应的官方构建文档 <https://source.android.com/docs/setup/build/building>；若 `win_sdk` 目标不存在，改查该分支是否提供等价的 Windows host 工具目标。
-
-macOS 版在 Mac 上执行同样的 `repo init/sync` 后：
-
-```bash
-source build/envsetup.sh
-lunch sdk-eng   # 或所选分支文档指定的 host 目标
-m adb
-ls out/host/darwin-x86/bin/adb
-```
+macOS 版需在对应架构的 Mac 上构建并测试。目前的 Windows 打包验收不代表 macOS 包已备齐；`dist:mac` 的发行校验会在缺少对应 ADB 时失败。
 
 ## 整理第三方许可清单
 
@@ -101,7 +60,5 @@ node scripts/verify-release.mjs win     # 或 mac
 
 ## 常见问题
 
-- **磁盘不够**：`repo sync` 加 `--depth=1 -c` 只拉当前分支浅克隆；仍不足则只能扩容，没有更小的合规路线。
-- **国内网络拉不动**：使用 TUNA AOSP 镜像（见上），`repo init -u https://mirrors.tuna.tsinghua.edu.cn/git/AOSP/platform/manifest`。
-- **构建结果复现**：用 `repo manifest -r -o pinned.xml` 固化全部项目的修订号，归档 `pinned.xml` 以便日后复建同一版本。
-- **WSL2**：步骤完全相同，注意给 WSL 分配足够内存（`.wslconfig` 中 `memory=16GB`），并把源码放在 WSL 原生文件系统（`~/`）而非 `/mnt/c`，否则编译极慢。
+- **构建结果复现**：保留源码包的 URL 和 SHA-256、AOSP 修订号、补丁、MSYS2 软件包版本及第三方许可清单。更换编译器或依赖版本后，应重新构建并登记哈希。
+- **目标电脑缺少 DLL**：重新检查可执行文件及其依赖 DLL 的导入表，并将缺失的非系统 DLL 一起登记；不要让目标用户另行安装 MSYS2。

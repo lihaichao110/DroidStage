@@ -23,7 +23,7 @@ for (const platform of targets) {
   if (!/^[0-9a-f]{40}$/.test(manifest.aospRevision)) throw new Error(`${platform} 缺少固定 AOSP 修订号`)
   if (!Array.isArray(manifest.files) || !manifest.files.length) throw new Error(`${platform} 缺少文件清单`)
   for (const item of manifest.files) {
-    if (!/^[\w.\-]+$/.test(item.name) || !/^[0-9a-f]{64}$/.test(item.sha256)) throw new Error('ADB 文件清单无效')
+    if (!/^[\w.+-]+$/.test(item.name) || !/^[0-9a-f]{64}$/.test(item.sha256)) throw new Error('ADB 文件清单无效')
     const binary = await readFile(path.join(dir, item.name))
     if (createHash('sha256').update(binary).digest('hex') !== item.sha256) throw new Error(`${platform}/${item.name} 校验失败`)
   }

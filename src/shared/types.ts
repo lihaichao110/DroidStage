@@ -133,6 +133,9 @@ export type BatchRecord = {
   devices: DeviceRun[]
   events: RunEvent[]
 }
+/** 监看页只传设备进度，逐设备日志另行读取，避免高频克隆整个批次。 */
+export type BatchSummary = Omit<BatchRecord, 'events'>
+export type BatchPage = { items: BatchSummary[]; hasMore: boolean }
 
 export type AppApi = {
   listDevices(): Promise<Device[]>
@@ -152,10 +155,11 @@ export type AppApi = {
   previewList(serial: string, step: ListClickStep): Promise<ListPreviewRow[]>
   saveTask(task: AutomationTask): Promise<string | null>
   loadTask(): Promise<AutomationTask | null>
-  runTask(task: AutomationTask, serials: string[]): Promise<BatchRecord>
+  runTask(task: AutomationTask, serials: string[]): Promise<BatchSummary>
   cancelRun(serial?: string): Promise<void>
-  batchState(): Promise<BatchRecord | null>
-  listBatches(): Promise<BatchRecord[]>
+  batchState(): Promise<BatchSummary | null>
+  listBatches(page: number): Promise<BatchPage>
+  batchEvents(batchId: string, serial: string): Promise<RunEvent[]>
   openRunDir(directory: string): Promise<void>
   onRunEvent(listener: (event: RunEvent) => void): () => void
   startMirroring(serial: string, quality: 'editor' | 'wall'): Promise<void>

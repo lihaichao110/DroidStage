@@ -49,6 +49,7 @@ describe('多设备批次', () => {
     const started = await coordinator.start(task, ['one', 'two'])
     await waitFinished(coordinator)
     expect(coordinator.state()?.devices.map((device) => device.status)).toEqual(['failure', 'success'])
+    expect(coordinator.summary()).not.toHaveProperty('events')
     expect(twoRequest).toHaveBeenCalledTimes(2)
     expect(events.every((event) => event.batchId === started.id && Boolean(event.serial))).toBe(true)
     expect(started.devices[0].runDir).not.toBe(started.devices[1].runDir)
@@ -69,6 +70,21 @@ describe('多设备批次', () => {
     await waitFinished(coordinator)
     expect(coordinator.state()?.devices.map((device) => device.status)).toEqual(['cancelled', 'success'])
     expect(request).toHaveBeenCalledTimes(3)
+  })
+
+  it('三十台并行时取消其中一台，其余设备继续完成', async () => {
+    const serials = Array.from({ length: 30 }, (_, index) => `device-${index}`)
+    vi.mocked(listDevices).mockResolvedValue(serials.map((serial) => ({ serial, state: 'device', usb: true })))
+    let release = () => {}
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    const sessions = Object.fromEntries(serials.map((serial) => [serial, { agent: () => ({ request: async () => gate }) }])) as unknown as Record<string, DeviceSession>
+    const coordinator = new BatchCoordinator(registry(sessions), () => {})
+    await coordinator.start(task, serials)
+    coordinator.cancel('device-17')
+    release()
+    await waitFinished(coordinator)
+    expect(coordinator.state()?.devices.find((device) => device.serial === 'device-17')?.status).toBe('cancelled')
+    expect(coordinator.state()?.devices.filter((device) => device.status === 'success')).toHaveLength(29)
   })
 
   it('目标离线时拒绝启动整个批次', async () => {
@@ -114,5 +130,41 @@ describe('多设备批次', () => {
     const [record] = await coordinator.history()
     expect(record.finishedAt).toBeTruthy()
     expect(record.devices[0]).toMatchObject({ status: 'failure', error: '应用已退出，运行中断' })
+  })
+
+  it('摘要不携带日志，按设备读取只返回对应事件', async () => {
+    const events: RunEvent[] = [
+      { kind: 'step', at: '2026-01-01T00:00:00Z', message: '设备一', serial: 'one', batchId: 'batch-logs' },
+      { kind: 'failure', at: '2026-01-01T00:00:01Z', message: '设备二', serial: 'two', batchId: 'batch-logs' }
+    ]
+    const dir = path.join(root, 'runs', 'batch-logs')
+    await mkdir(dir, { recursive: true })
+    await writeFile(path.join(dir, 'batch.json'), JSON.stringify({ id: 'batch-logs', taskName: '日志测试', startedAt: '2026-01-01T00:00:00Z', finishedAt: '2026-01-01T00:00:02Z', devices: [
+      { serial: 'one', status: 'success' }, { serial: 'two', status: 'failure' }
+    ], events }))
+    const coordinator = new BatchCoordinator(registry({}), () => {})
+    const page = await coordinator.historyPage(0)
+    expect(page.items[0]).not.toHaveProperty('events')
+    expect(await coordinator.events('batch-logs', 'one')).toEqual([events[0]])
+    await expect(coordinator.events('batch-logs', 'missing')).rejects.toThrow('不存在')
+    await expect(coordinator.events('../batch-logs', 'one')).rejects.toThrow('批次 ID 无效')
+  })
+
+  it('历史批次按二十条分页并保留后续页', async () => {
+    const runs = path.join(root, 'runs')
+    for (let index = 0; index < 45; index++) {
+      const id = `batch-${String(index).padStart(3, '0')}`
+      const dir = path.join(runs, id)
+      await mkdir(dir, { recursive: true })
+      await writeFile(path.join(dir, 'batch.json'), JSON.stringify({ id, taskName: id, startedAt: '2026-01-01T00:00:00Z', finishedAt: '2026-01-01T00:00:01Z', devices: [], events: [] }))
+    }
+    const coordinator = new BatchCoordinator(registry({}), () => {})
+    const first = await coordinator.historyPage(0)
+    const second = await coordinator.historyPage(1)
+    const third = await coordinator.historyPage(2)
+    expect([first.items.length, second.items.length, third.items.length]).toEqual([20, 20, 5])
+    expect([first.hasMore, second.hasMore, third.hasMore]).toEqual([true, true, false])
+    expect(first.items[0].id).toBe('batch-044')
+    await expect(coordinator.historyPage(-1)).rejects.toThrow('页码无效')
   })
 })

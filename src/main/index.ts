@@ -166,10 +166,14 @@ app.whenReady().then(() => {
     validateTask(task)
     return task
   })
-  ipcMain.handle('task:run', (_event, task: AutomationTask, serials: string[]) => batches.start(task, serials))
+  ipcMain.handle('task:run', async (_event, task: AutomationTask, serials: string[]) => {
+    await batches.start(task, serials)
+    return batches.summary()
+  })
   ipcMain.handle('task:cancel', (_event, serial?: string) => batches.cancel(serial))
-  ipcMain.handle('batch:state', () => batches.state())
-  ipcMain.handle('batch:list', () => batches.history())
+  ipcMain.handle('batch:state', () => batches.summary())
+  ipcMain.handle('batch:list', (_event, page: number) => batches.historyPage(page))
+  ipcMain.handle('batch:events', (_event, batchId: string, serial: string) => batches.events(batchId, serial))
   ipcMain.handle('run:open-dir', async (_event, directory: string) => {
     if (typeof directory !== 'string') throw new Error('结果目录无效')
     const root = path.resolve(app.getPath('userData'), 'runs')

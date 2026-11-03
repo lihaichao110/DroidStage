@@ -2,11 +2,11 @@
  * 设备管理页：发现、筛选、逐台连接设备并选择任务运行目标。
  */
 import { useState } from 'react'
-import type { BatchRecord, Device } from '../../../shared/types'
+import type { BatchSummary, Device } from '../../../shared/types'
 import type { useDeviceFleet } from '../hooks/use-device-fleet'
 
 type Fleet = ReturnType<typeof useDeviceFleet>
-type Props = { fleet: Fleet; batch: BatchRecord | null; onFocus: (serial: string) => void }
+type Props = { fleet: Fleet; batch: BatchSummary | null; onFocus: (serial: string) => void }
 
 export function DeviceManagerPage({ fleet, batch, onFocus }: Props) {
   const [query, setQuery] = useState('')
@@ -60,7 +60,7 @@ export function DeviceManagerPage({ fleet, batch, onFocus }: Props) {
 }
 
 /** 单行集中显示连接与运行状态，避免不同设备的失败提示混在一起。 */
-function DeviceRow({ device, fleet, batch, isRunning, onFocus }: { device: Device; fleet: Fleet; batch: BatchRecord | null; isRunning: boolean; onFocus: (serial: string) => void }) {
+function DeviceRow({ device, fleet, batch, isRunning, onFocus }: { device: Device; fleet: Fleet; batch: BatchSummary | null; isRunning: boolean; onFocus: (serial: string) => void }) {
   const connected = fleet.connectedSerials.includes(device.serial)
   const run = batch?.devices.find((item) => item.serial === device.serial)
   const taskStatus = isRunning && run ? run.status : '空闲'

@@ -5,7 +5,7 @@ import { app } from 'electron'
 import { randomUUID } from 'node:crypto'
 import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import type { AutomationTask, BatchRecord, RunEvent } from '../shared/types'
+import type { AutomationTask, BatchPage, BatchRecord, BatchSummary, RunEvent } from '../shared/types'
 import { validateTask } from '../shared/task'
 import { DeviceRegistry } from './device-registry'
 import { TaskRunner } from './runner'
@@ -25,6 +25,9 @@ export class BatchCoordinator {
   }
 
   state(): BatchRecord | null { return this.current }
+
+  /** 返回当前批次的轻量摘要，运行事件通过独立接口按设备读取。 */
+  summary(): BatchSummary | null { return this.current ? summarize(this.current) : null }
 
   /** 校验全部目标后启动一个批次；设备失败只记录在该设备，不阻断其他设备。 */
   async start(task: AutomationTask, serials: string[]): Promise<BatchRecord> {
@@ -76,32 +79,59 @@ export class BatchCoordinator {
     for (const runner of this.runners.values()) runner.cancel()
   }
 
-  /** 从 runs 中读取历史批次；损坏的单条记录不影响其他批次展示。 */
-  async history(): Promise<BatchRecord[]> {
+  /** 兼容已有调用；损坏的单条记录不影响其他批次展示。 */
+  async history(): Promise<BatchRecord[]> { return (await this.readHistory(0, 100)).records }
+
+  /** 历史列表每次仅载入二十批，IPC 不包含逐步事件。 */
+  async historyPage(page: number): Promise<BatchPage> {
+    if (!Number.isInteger(page) || page < 0) throw new Error('历史页码无效')
+    const { records, hasMore } = await this.readHistory(page * 20, 20)
+    return { items: records.map(summarize), hasMore }
+  }
+
+  /** 只读取所选设备的日志，并校验批次 ID 和设备归属。 */
+  async events(batchId: string, serial: string): Promise<RunEvent[]> {
+    if (typeof batchId !== 'string' || !/^batch-[A-Za-z0-9_-]+$/.test(batchId)) throw new Error('批次 ID 无效')
+    if (typeof serial !== 'string' || !serial) throw new Error('设备序列号无效')
+    const record = this.current?.id === batchId ? this.current : await this.readRecord(batchId)
+    if (!record || !record.devices.some((device) => device.serial === serial)) throw new Error('批次或设备不存在')
+    return record.events.filter((event) => event.serial === serial)
+  }
+
+  private async readHistory(offset: number, limit: number): Promise<{ records: BatchRecord[]; hasMore: boolean }> {
     const root = path.join(app.getPath('userData'), 'runs')
     let names: string[]
-    try { names = (await readdir(root)).filter((name) => name.startsWith('batch-')).sort().reverse().slice(0, 100) }
-    catch { return this.current ? [this.current] : [] }
-    const records = await Promise.all(names.map(async (name) => {
+    try { names = (await readdir(root)).filter((name) => /^batch-[A-Za-z0-9_-]+$/.test(name)).sort().reverse() }
+    catch { return { records: offset === 0 && this.current ? [this.current] : [], hasMore: false } }
+    const pageNames = names.slice(offset, offset + limit)
+    const hasMore = names.length > offset + limit
+    const records = await Promise.all(pageNames.map(async (name) => {
       try {
-        const file = path.join(root, name, 'batch.json')
-        const record = JSON.parse(await readFile(file, 'utf8')) as BatchRecord
-        if (!record.finishedAt && record.id !== this.current?.id) {
-          // 主进程退出后旧执行器已不存在，恢复时把悬挂状态明确标为中断。
-          record.finishedAt = new Date().toISOString()
-          for (const device of record.devices) {
-            if (device.status === 'pending' || device.status === 'running') {
-              device.status = 'failure'
-              device.error = '应用已退出，运行中断'
-            }
-          }
-          await writeFile(file, JSON.stringify(record, null, 2), 'utf8')
-        }
-        return record
+        return this.current?.id === name ? this.current : await this.readRecord(name)
       }
       catch { return null }
     }))
-    return records.filter((record): record is BatchRecord => Boolean(record)).map((record) => record.id === this.current?.id ? this.current : record)
+    return { records: records.filter((record): record is BatchRecord => Boolean(record)), hasMore }
+  }
+
+  private async readRecord(batchId: string): Promise<BatchRecord> {
+    const file = path.join(this.batchDir(batchId), 'batch.json')
+    const record = JSON.parse(await readFile(file, 'utf8')) as BatchRecord
+    if (record.id !== batchId || !Array.isArray(record.devices) || !Array.isArray(record.events) || typeof record.startedAt !== 'string') {
+      throw new Error('批次记录损坏')
+    }
+    if (!record.finishedAt) {
+      // 主进程退出后旧执行器已不存在，恢复时把悬挂状态明确标为中断。
+      record.finishedAt = new Date().toISOString()
+      for (const device of record.devices) {
+        if (device.status === 'pending' || device.status === 'running') {
+          device.status = 'failure'
+          device.error = '应用已退出，运行中断'
+        }
+      }
+      await writeFile(file, JSON.stringify(record, null, 2), 'utf8')
+    }
+    return record
   }
 
   private async runDevice(record: BatchRecord, task: AutomationTask, serial: string, index: number): Promise<void> {
@@ -154,4 +184,10 @@ export class BatchCoordinator {
     this.writeQueue = this.writeQueue.catch(() => {}).then(() => writeFile(target, snapshot, 'utf8'))
     return this.writeQueue
   }
+}
+
+/** IPC 投影不带事件数组，保留原有 batch.json 结构。 */
+export function summarize(record: BatchRecord): BatchSummary {
+  const { events: _events, ...summary } = record
+  return summary
 }

@@ -9,7 +9,7 @@
     "build": "tsc --noEmit && electron-vite build",
     "test": "vitest run",
     "stage:agent": "node scripts/stage-agent.mjs",
-    "dist:win": "npm run build && node scripts/verify-release.mjs win && electron-builder --win nsis --x64 --publish never",
+    "dist:win": "npm run build && node scripts/verify-release.mjs win && electron-builder --win nsis --x64 --publish never --config.electronDist=node_modules/electron/dist && node scripts/verify-packed-win.mjs",
     "dist:mac": "npm run build && node scripts/verify-release.mjs mac && electron-builder --mac dmg zip --x64 --arm64 --publish never"
   },
   "dependencies": {
@@ -39,7 +39,7 @@
       { "from": "assets/adb", "to": "adb" },
       { "from": "assets/mirroring", "to": "mirroring" }
     ],
-    "win": { "target": ["nsis"], "arch": ["x64"], "artifactName": "${productName}-Setup-${version}-${arch}.${ext}", "icon": "src/renderer/src/assets/droidstage-icon.ico" },
+    "win": { "target": ["nsis"], "artifactName": "${productName}-Setup-${version}-${arch}.${ext}", "icon": "src/renderer/src/assets/droidstage-icon.ico" },
     "mac": { "target": ["dmg", "zip"], "artifactName": "${productName}-${version}-${arch}.${ext}", "category": "public.app-category.developer-tools", "icon": "src/renderer/src/assets/droidstage-icon.icns" },
     "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true }
   }

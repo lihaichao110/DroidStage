@@ -14,10 +14,18 @@ export class MirrorRegistry {
   private readonly mirrors = new Map<string, MirrorService>()
   private readonly companions = new Map<string, CompanionMirrorService>()
   private readonly wall = new Set<string>()
+  private readonly stopping = new Map<string, Promise<void>>()
 
-  /** 为指定设备开启投屏；监看画面每页最多六路。 */
+  /** 为指定设备开启投屏；工作台最多同时保留四路。 */
   async start(window: BrowserWindow, serial: string, quality: 'editor' | 'wall', companion?: CompanionSession): Promise<void> {
-    if (quality === 'wall' && !this.wall.has(serial) && this.wall.size >= 6) throw new Error('设备画面每页最多同时显示 6 台')
+    if (this.stopping.has(serial)) await this.stopping.get(serial)
+    // 切换焦点设备时，旧流异步关闭；等它真正释放后才能占用第四个名额。
+    while (quality === 'wall' && !this.wall.has(serial) && this.wall.size >= 4) {
+      const freeing = [...this.stopping].filter(([stoppingSerial]) => this.wall.has(stoppingSerial)).map(([, pending]) => pending)
+      if (!freeing.length) break
+      await Promise.race(freeing)
+    }
+    if (quality === 'wall' && !this.wall.has(serial) && this.wall.size >= 4) throw new Error('运行工作台最多同时监看 4 台设备')
     if (companion) {
       let mirror = this.companions.get(serial)
       if (!mirror) { mirror = new CompanionMirrorService(); this.companions.set(serial, mirror) }
@@ -37,10 +45,16 @@ export class MirrorRegistry {
 
   /** 停止单台设备投屏并释放其 ADB 转发。 */
   async stop(serial: string): Promise<void> {
-    this.wall.delete(serial)
-    const mirror = this.mirrors.get(serial)
-    await mirror?.stop()
-    await this.companions.get(serial)?.stop()
+    const pending = this.stopping.get(serial)
+    if (pending) return pending
+    const operation = (async () => {
+      await this.mirrors.get(serial)?.stop()
+      await this.companions.get(serial)?.stop()
+      this.wall.delete(serial)
+    })()
+    this.stopping.set(serial, operation)
+    try { await operation }
+    finally { this.stopping.delete(serial) }
   }
 
   sendControl(serial: string, message: Buffer): void {

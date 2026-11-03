@@ -10,7 +10,8 @@ if (!['win32', 'darwin-x64', 'darwin-arm64'].includes(platform) || !/^[0-9a-f]{4
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const target = path.join(root, 'assets', 'adb', platform)
 const source = path.resolve(sourceDir)
-const names = (await readdir(source)).filter((name) => /^[\w.\-]+$/.test(name) && name !== 'manifest.json')
+// Windows 工具链的 libstdc++-6.dll 含加号，必须随 ADB 一起登记，否则目标电脑无法启动。
+const names = (await readdir(source)).filter((name) => /^[\w.+-]+$/.test(name) && name !== 'manifest.json')
 if (!names.includes(platform === 'win32' ? 'adb.exe' : 'adb')) throw new Error('构建输出缺少 ADB 可执行文件')
 await mkdir(target, { recursive: true })
 const files = []
