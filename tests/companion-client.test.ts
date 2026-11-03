@@ -17,6 +17,7 @@ describe('手机端直连连接前校验', () => {
 
   it('端口被拒绝时提示在手机上启动独立服务', () => {
     const error = companionError(new Error('connect ECONNREFUSED 192.168.1.2:39828'), '192.168.1.2')
+    expect(error.message).toContain('手机上的卓序')
     expect(error.message).toContain('启动无线服务')
     expect(error.message).toContain('ECONNREFUSED')
   })

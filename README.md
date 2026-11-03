@@ -1,5 +1,7 @@
 # DroidStage
 
+应用名称：**卓序**。
+
 通过 USB 或无线 ADB 在电脑上编辑、运行安卓 App 自动化流程。桌面端使用 Electron、React、TypeScript；手机端使用 Kotlin 与 AndroidX UI Automator 2.4.0。自动化任务支持多台 Android 10+ 手机、Windows 10/11 x64、macOS 13+ Intel/Apple Silicon。Android 11+ 可在软件内无线配对；Android 10 及以下可先用 USB 授权，再切换到无线 ADB，但 Android 9 及以下尚不能运行任务。
 
 ## 用户使用

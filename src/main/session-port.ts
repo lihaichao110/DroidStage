@@ -1,7 +1,7 @@
 /**
  * 任务所需设备能力：ADB 代理与手机端直连会话共用此接口。
  */
-import type { HierarchySnapshot, Selector } from '../shared/types'
+import type { HierarchySnapshot, MatchInfo, Selector } from '../shared/types'
 
 export type AgentPort = {
   request<T>(op: string, args?: Record<string, unknown>, timeoutMs?: number): Promise<T>
@@ -13,6 +13,7 @@ export type DeviceSessionPort = {
   agent(): AgentPort
   isAlive(): boolean
   count(selector: Selector, waitMs?: number): Promise<number>
+  matches(selector: Selector): Promise<MatchInfo[]>
   screenshot(): Promise<Buffer>
   snapshot(): Promise<HierarchySnapshot>
   launch(packageName: string): Promise<void>

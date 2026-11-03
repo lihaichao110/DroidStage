@@ -48,7 +48,7 @@ export default function App() {
 
   return <div className="app">
     <header className="topbar">
-      <div className="brand"><img src={droidstageIcon} alt="" /><h1>DroidStage</h1></div>
+      <div className="brand"><img src={droidstageIcon} alt="" /><h1>卓序</h1></div>
       <nav className="page-tabs" aria-label="主页面">
         {PAGES.map((item) => <button key={item.id} className={page === item.id ? 'active' : ''} aria-current={page === item.id ? 'page' : undefined} onClick={() => setPage(item.id)}>{item.label}{item.id === 'monitor' && running && <span className="nav-live" />}</button>)}
       </nav>

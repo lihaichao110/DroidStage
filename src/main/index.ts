@@ -4,7 +4,7 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import { existsSync } from 'node:fs'
+import { existsSync, mkdirSync } from 'node:fs'
 import { adb, listDevices, onDevice } from './adb'
 import { pairCompanion } from './companion-client'
 import { DeviceRegistry } from './device-registry'
@@ -32,7 +32,7 @@ function createWindow(): void {
     height: 900,
     minWidth: 1100,
     minHeight: 700,
-    title: 'DroidStage',
+    title: '卓序',
     // 开发模式运行的是 Electron 自带的可执行文件，需单独指定窗口图标。
     icon: process.platform === 'win32' && !app.isPackaged
       ? path.join(app.getAppPath(), 'src/renderer/src/assets/droidstage-icon.ico')
@@ -51,6 +51,11 @@ function createWindow(): void {
     return { action: 'deny' }
   })
 }
+
+// 产品展示名改为「卓序」后，沿用原有数据目录以保留配对信息、运行记录和 ADB 缓存。
+const userDataPath = path.join(app.getPath('appData'), 'DroidStage')
+mkdirSync(userDataPath, { recursive: true })
+app.setPath('userData', userDataPath)
 
 app.whenReady().then(() => {
   createWindow()
@@ -118,7 +123,7 @@ app.whenReady().then(() => {
   ipcMain.handle('device:matches', (_event, serial: string, selector: Selector) => {
     if (batches.isRunning(serial)) throw new Error('任务运行中不能校验控件')
     validateSelector(selector)
-    return devices.require(serial).agent().request('inspectMatches', { selector })
+    return devices.require(serial).matches(selector)
   })
   ipcMain.handle('device:list-preview', (_event, serial: string, step: import('../shared/types').ListClickStep) => {
     if (batches.isRunning(serial)) throw new Error('任务运行中不能校验列表')
@@ -152,13 +157,13 @@ app.whenReady().then(() => {
   })
   ipcMain.handle('task:save', async (_event, task: AutomationTask) => {
     validateTask(task)
-    const result = await dialog.showSaveDialog(window!, { title: '保存任务', defaultPath: `${task.name}.json`, filters: [{ name: 'DroidStage 任务', extensions: ['json'] }] })
+    const result = await dialog.showSaveDialog(window!, { title: '保存任务', defaultPath: `${task.name}.json`, filters: [{ name: '卓序任务', extensions: ['json'] }] })
     if (result.canceled || !result.filePath) return null
     await writeFile(result.filePath, JSON.stringify(task, null, 2), 'utf8')
     return result.filePath
   })
   ipcMain.handle('task:load', async () => {
-    const result = await dialog.showOpenDialog(window!, { title: '打开任务', properties: ['openFile'], filters: [{ name: 'DroidStage 任务', extensions: ['json'] }] })
+    const result = await dialog.showOpenDialog(window!, { title: '打开任务', properties: ['openFile'], filters: [{ name: '卓序任务', extensions: ['json'] }] })
     if (result.canceled || !result.filePaths[0]) return null
     const text = await readFile(result.filePaths[0], 'utf8')
     if (text.length > 2_000_000) throw new Error('任务文件过大')

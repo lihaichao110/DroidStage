@@ -8,8 +8,8 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-const version = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8')).version
-const installer = path.join(root, 'release', `DroidStage-Setup-${version}-x64.exe`)
+const { version, build } = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8'))
+const installer = path.join(root, 'release', `${build.productName}-Setup-${version}-x64.exe`)
 const resources = path.join(root, 'release', 'win-unpacked', 'resources')
 const adbDir = path.join(resources, 'adb', 'win32')
 

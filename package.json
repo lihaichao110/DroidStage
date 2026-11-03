@@ -2,7 +2,7 @@
   "name": "droidstage",
   "version": "0.1.0",
   "private": true,
-  "description": "DroidStage Android UI automation desktop client",
+  "description": "卓序 Android UI 自动化桌面工具",
   "main": "./out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
@@ -31,7 +31,7 @@
   },
   "build": {
     "appId": "dev.androidautodesk.app",
-    "productName": "DroidStage",
+    "productName": "卓序",
     "directories": { "output": "release" },
     "files": ["out/**/*", "package.json"],
     "extraResources": [

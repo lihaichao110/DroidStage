@@ -43,9 +43,9 @@ class CompanionService : Service() {
     override fun onCreate() {
         super.onCreate()
         val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-        manager.createNotificationChannel(NotificationChannel("companion", "DroidStage 无线服务", NotificationManager.IMPORTANCE_LOW))
+        manager.createNotificationChannel(NotificationChannel("companion", "卓序无线服务", NotificationManager.IMPORTANCE_LOW))
         val notification = Notification.Builder(this, "companion")
-            .setContentTitle("DroidStage 无线服务运行中")
+            .setContentTitle("卓序无线服务运行中")
             .setContentText("保持手机与电脑在同一局域网")
             .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
             .build()
@@ -74,7 +74,7 @@ class CompanionService : Service() {
                 // Android 14+ 在获取投屏对象前要求前台服务标记 mediaProjection。
                 val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
                 val notification = Notification.Builder(this, "companion")
-                    .setContentTitle("DroidStage 无线投屏已授权")
+                    .setContentTitle("卓序无线投屏已授权")
                     .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth).build()
                 startForeground(101, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC or ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION)
                 ProjectionEngine.start(this, intent.getIntExtra("resultCode", 0), data)

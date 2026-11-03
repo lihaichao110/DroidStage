@@ -19,7 +19,7 @@ import java.util.concurrent.TimeUnit
 import android.util.Xml
 
 internal object AccessibilityBridge {
-    private fun service(): CompanionAccessibility = CompanionAccessibility.current ?: error("请先在手机上启用 DroidStage 无障碍服务")
+    private fun service(): CompanionAccessibility = CompanionAccessibility.current ?: error("请先在手机上启用卓序无障碍服务")
     private fun root(): AccessibilityNodeInfo = service().rootInActiveWindow ?: error("无法读取当前屏幕控件，请解锁手机并检查无障碍权限")
 
     /** 查询当前屏幕精确匹配的节点；排序与 USB 会话的视觉顺序一致。 */

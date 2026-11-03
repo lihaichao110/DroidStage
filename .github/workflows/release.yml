@@ -129,7 +129,7 @@ jobs:
             echo "Release $GITHUB_REF_NAME 已存在" >&2
             exit 1
           fi
-          gh release create "$GITHUB_REF_NAME" --draft --verify-tag --title "DroidStage $GITHUB_REF_NAME" --generate-notes
+          gh release create "$GITHUB_REF_NAME" --draft --verify-tag --title "卓序 $GITHUB_REF_NAME" --generate-notes
           cleanup() { gh release delete "$GITHUB_REF_NAME" --yes || true; }
           trap cleanup ERR
           gh release upload "$GITHUB_REF_NAME" release-assets/*.exe release-assets/*.dmg release-assets/*.zip release-assets/SHA256SUMS.txt

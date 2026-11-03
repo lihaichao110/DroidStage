@@ -54,7 +54,7 @@ internal object ProjectionEngine {
         val active = projection ?: error("请先在手机上允许录屏")
         val metrics = metrics(context)
         val reader = ImageReader.newInstance(metrics.widthPixels, metrics.heightPixels, PixelFormat.RGBA_8888, 2)
-        val display = active.createVirtualDisplay("DroidStage 截图", metrics.widthPixels, metrics.heightPixels,
+        val display = active.createVirtualDisplay("卓序截图", metrics.widthPixels, metrics.heightPixels,
             metrics.densityDpi, DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR, reader.surface, null, null)
         try {
             val deadline = System.currentTimeMillis() + 3000
@@ -99,7 +99,7 @@ internal object ProjectionEngine {
         codec.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
         val surface = codec.createInputSurface()
         codec.start()
-        val display = active.createVirtualDisplay("DroidStage 投屏", width, height, physical.densityDpi,
+        val display = active.createVirtualDisplay("卓序投屏", width, height, physical.densityDpi,
             DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR, surface, null, null)
         encoder = codec
         videoDisplay = display

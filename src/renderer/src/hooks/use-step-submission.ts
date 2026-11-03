@@ -130,7 +130,9 @@ export function useStepSubmission(draft: SubmissionDraft) {
       setSubmission({ phase: 'success', message })
       draft.setMessage(message)
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
+      const raw = error instanceof Error ? error.message : String(error)
+      // 超时多为设备瞬时繁忙（控件树刷新、动画重绘），给出可操作指引而不是裸错误
+      const message = raw.includes('操作超时') ? `${raw}。设备响应缓慢，请稍等几秒后重试` : raw
       setSubmission({ phase: 'error', message: `${draft.editingId ? '保存修改' : '添加步骤'}失败：${message}`, canRefineSelector: error instanceof SelectorMatchError })
       draft.setMessage(message)
     } finally {

@@ -22,7 +22,7 @@ export function verifyFingerprint(actual: string | undefined, expected: string):
 export function companionError(error: unknown, ip: string): Error {
   const reason = error instanceof Error ? error.message : String(error)
   if (/ECONNREFUSED|10061|actively refused|积极拒绝/i.test(reason)) {
-    return new Error(`手机 ${ip} 的直连服务未开放 39828 端口。请在手机上的 DroidStage 点击“启动无线服务”，确认手机与电脑仍在同一 Wi‑Fi。原始错误：${reason}`)
+    return new Error(`手机 ${ip} 的直连服务未开放 39828 端口。请在手机上的卓序点击“启动无线服务”，确认手机与电脑仍在同一 Wi‑Fi。原始错误：${reason}`)
   }
   if (/ETIMEDOUT|EHOSTUNREACH|ENETUNREACH|超时/i.test(reason)) {
     return new Error(`连接手机 ${ip} 的直连服务超时。请在手机上查看“无线服务”是否仍为已启动，并核对当前 Wi‑Fi IP 与两端网络。原始错误：${reason}`)
