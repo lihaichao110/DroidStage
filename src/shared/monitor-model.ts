@@ -63,3 +63,14 @@ export function monitorCounts(batch: BatchSummary | null): Record<DeviceRunStatu
 export function preferredMonitorSerial(batch: BatchSummary | null): string {
   return batch?.devices.find((device) => device.status === 'running')?.serial ?? batch?.devices[0]?.serial ?? ''
 }
+
+/** 确认运行时选定的首要监看设备：焦点设备在目标内则用之，否则第一台目标。 */
+export function primaryRunSerial(targets: string[], focused: string | null): string {
+  if (!targets.length) return ''
+  return focused && targets.includes(focused) ? focused : targets[0]
+}
+
+/** 准备期的画面列表：首要设备置顶、其余目标依次补足，最多 4 路（与工作台同屏上限一致）。 */
+export function pendingPreviewSerials(targets: string[], primary: string): string[] {
+  return [primary, ...targets.filter((serial) => serial !== primary)].filter(Boolean).slice(0, 4)
+}

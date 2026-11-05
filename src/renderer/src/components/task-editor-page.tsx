@@ -2,17 +2,19 @@
  * 任务编辑页：保留单台设备拾取与三栏编辑，运行目标由设备管理页独立选择。
  */
 import { useEffect, useRef, useState } from 'react'
-import type { AutomationTask, BatchSummary, Device, HierarchySnapshot, Point, Selector, Step, UiNode } from '../../../shared/types'
+import type { AutomationTask, Device, HierarchySnapshot, Point, Selector, Step, UiNode } from '../../../shared/types'
 import { suggestedSelector } from '../../../shared/task'
 import { InspectorPanel } from './inspector-panel'
 import { WorkflowPanel } from './workflow-panel'
 import { StepSettings } from './step-settings'
+import { EditorToolbar } from './editor-toolbar'
+import { RunReviewDialog } from './run-review-dialog'
+import { useStepDraft } from '../hooks/use-step-draft'
 import { useTaskActions } from '../hooks/use-task-actions'
-import { useConditionDraft } from '../hooks/use-condition-draft'
 import { useStepSubmission } from '../hooks/use-step-submission'
+import { useConditionDraft } from '../hooks/use-condition-draft'
 import { useListClickDraft } from '../hooks/use-list-click-draft'
 
-type EditorAction = Step['type']
 const defaultTask: AutomationTask = { version: 1, name: '新任务', packageName: '', steps: [] }
 
 type TaskEditorPageProps = {
@@ -25,37 +27,34 @@ type TaskEditorPageProps = {
   setFocused: (serial: string) => void
   setMessage: (message: string) => void
   onShowDevices: () => void
-  onBatchStarted: (batch: BatchSummary) => void
+  onRunPrepared: (task: AutomationTask, targets: string[]) => void
 }
 
-export function TaskEditorPage({ active, devices, connectedSerials, focused, targets, running, setFocused, setMessage, onShowDevices, onBatchStarted }: TaskEditorPageProps) {
+export function TaskEditorPage({ active, devices, connectedSerials, focused, targets, running, setFocused, setMessage, onShowDevices, onRunPrepared }: TaskEditorPageProps) {
   const connected = connectedSerials.includes(focused)
+  // 页面级状态：拾取结果与任务本体，草稿之外的一切
   const [snapshot, setSnapshot] = useState<HierarchySnapshot | null>(null)
   const [selectedNode, setSelectedNode] = useState<UiNode | null>(null)
   const [hoverNode, setHoverNode] = useState<UiNode | null>(null)
   const [selectedPoint, setSelectedPoint] = useState<Point | null>(null)
   const [selector, setSelector] = useState<Selector | null>(null)
   const [task, setTask] = useState<AutomationTask>(defaultTask)
-  const [action, setAction] = useState<EditorAction>('tap')
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [text, setText] = useState('')
-  const [timeout, setTimeoutValue] = useState(10000)
-  const [exists, setExists] = useState(true)
-  const conditionDraft = useConditionDraft()
-  const listDraft = useListClickDraft()
-  const [key, setKey] = useState<'back' | 'home'>('back')
-  const [swipeFrom, setSwipeFrom] = useState<Point>({ x: 300, y: 700 })
-  const [swipeTo, setSwipeTo] = useState<Point>({ x: 300, y: 300 })
-  const [swipeDuration, setSwipeDuration] = useState(500)
   const [busy, setBusy] = useState(false)
   const [runReview, setRunReview] = useState<'run' | 'save-run' | null>(null)
+  // 步骤草稿三件套：通用字段 + 条件/列表子草稿
+  const { draft, update: updateDraft, loadStep } = useStepDraft()
+  const conditionDraft = useConditionDraft()
+  const listDraft = useListClickDraft()
   const focusedRef = useRef(focused)
   focusedRef.current = focused
   const { submit, submission, clearFeedback, isSubmitting } = useStepSubmission({
-    task, setTask, setEditingId, setMessage, focused, connected, editingId, action, selector,
-    selectedNode, selectedPoint, text, timeout, exists, keyValue: key, swipeFrom, swipeTo,
-    swipeDuration, buildCondition: conditionDraft.build, resetCondition: conditionDraft.reset,
-    buildList: listDraft.build, resetList: listDraft.reset
+    task, setTask, setMessage, focused, connected,
+    draft,
+    pick: { selector, selectedNode, selectedPoint },
+    buildCondition: conditionDraft.build,
+    buildList: listDraft.build,
+    // 提交成功后退出编辑态；保留已填参数便于连续添加同类步骤
+    onDone: () => { updateDraft({ editingId: null }); conditionDraft.reset(); listDraft.reset() }
   })
 
   useEffect(() => {
@@ -106,20 +105,15 @@ export function TaskEditorPage({ active, devices, connectedSerials, focused, tar
 
   function editStep(step: Step): void {
     clearFeedback()
-    setEditingId(step.id)
-    setAction(step.type)
+    // 通用字段（id、动作、参数）整体回填，无关字段在 draftFromStep 内回落默认值
+    loadStep(step)
     setSelectedNode(null)
     setSelector('selector' in step ? step.selector ?? null : null)
     setSelectedPoint(step.type === 'tap' ? step.point ?? null : null)
-    if ('timeoutMs' in step) setTimeoutValue(step.timeoutMs)
-    if (step.type === 'input') setText(step.text)
-    if (step.type === 'wait' || step.type === 'assert') setExists(step.exists)
     if (step.type === 'condition') conditionDraft.load(step)
     else conditionDraft.reset()
     if (step.type === 'listClick') listDraft.load(step)
     else listDraft.reset()
-    if (step.type === 'swipe') { setSwipeFrom(step.from); setSwipeTo(step.to); setSwipeDuration(step.durationMs) }
-    if (step.type === 'key') setKey(step.key)
     setMessage('正在修改步骤；选择新控件可替换原定位条件。')
   }
 
@@ -127,31 +121,33 @@ export function TaskEditorPage({ active, devices, connectedSerials, focused, tar
     const target = index + offset
     if (target < 0 || target >= task.steps.length) return
     const steps = [...task.steps]
-      ;[steps[index], steps[target]] = [steps[target], steps[index]]
+    ;[steps[index], steps[target]] = [steps[target], steps[index]]
     setTask({ ...task, steps })
   }
+
   function startNewStep(): void {
     clearFeedback()
-    setEditingId(null)
+    updateDraft({ editingId: null })
     conditionDraft.reset()
     listDraft.reset()
     setMessage('在右侧配置新步骤。')
   }
-  const { save, load, run, saveAndRun } = useTaskActions({ task, setTask, setEditingId, setMessage, onTaskLoaded: () => { conditionDraft.reset(); listDraft.reset() }, targets, onBatchStarted })
+
+  const { save, load, run, saveAndRun } = useTaskActions({
+    task, setTask, setMessage,
+    onTaskLoaded: () => { updateDraft({ editingId: null }); conditionDraft.reset(); listDraft.reset() },
+    targets, onRunPrepared
+  })
+  const canRun = targets.length > 0 && task.steps.length > 0 && draft.editingId === null && !running && !isSubmitting
 
   return <div className={`editor-page${active ? '' : ' page-hidden'}`}>
-    <div className="editor-toolbar">
-      <div className="editor-title"><h2>{task.name || '未命名任务'}</h2><span>{task.steps.length} 个步骤</span></div>
-      <label className="editor-device">编辑设备
-        <select value={focused} onChange={(event) => setFocused(event.target.value)} disabled={busy || running || isSubmitting}>
-          {!connectedSerials.length && <option value="">无已连接设备</option>}
-          {devices.filter((device) => connectedSerials.includes(device.serial)).map((device) => <option key={device.serial} value={device.serial}>{device.model || device.serial} · {device.serial}</option>)}
-        </select>
-      </label>
-      <button className="target-summary" onClick={onShowDevices} disabled={isSubmitting}>运行目标 {targets.length} 台 · 选择</button>
-      <div className="editor-actions"><button onClick={() => void load()} disabled={running || isSubmitting}>打开任务</button><button onClick={() => void save()} disabled={running || isSubmitting}>保存任务</button><button onClick={() => setRunReview('run')} disabled={!targets.length || running || isSubmitting || !task.steps.length || Boolean(editingId)}>运行</button><button className="primary" onClick={() => setRunReview('save-run')} disabled={!targets.length || running || isSubmitting || !task.steps.length || Boolean(editingId)}>保存并运行</button></div>
-    </div>
-
+    <EditorToolbar
+      task={task} focused={focused} devices={devices} connectedSerials={connectedSerials}
+      targets={targets} busy={busy} running={running} isSubmitting={isSubmitting} canRun={canRun}
+      onFocusedChange={setFocused} onShowDevices={onShowDevices}
+      onLoad={() => void load()} onSave={() => void save()}
+      onRun={() => setRunReview('run')} onSaveAndRun={() => setRunReview('save-run')}
+    />
     {active && <main className="workspace">
       <InspectorPanel
         serial={focused}
@@ -168,7 +164,7 @@ export function TaskEditorPage({ active, devices, connectedSerials, focused, tar
       />
       <WorkflowPanel
         task={task}
-        activeStepId={editingId}
+        activeStepId={draft.editingId}
         isRunning={running || isSubmitting}
         onTaskChange={setTask}
         onNewStep={startNewStep}
@@ -178,60 +174,33 @@ export function TaskEditorPage({ active, devices, connectedSerials, focused, tar
       <StepSettings
         serial={focused}
         task={task}
-        action={action}
-        editingId={editingId}
-        text={text}
-        timeout={timeout}
-        exists={exists}
-        conditionMode={conditionDraft.mode}
-        repeatCount={conditionDraft.repeatCount}
-        maxChecks={conditionDraft.maxChecks}
-        intervalMs={conditionDraft.intervalMs}
-        whenPresent={conditionDraft.whenPresent}
-        whenAbsent={conditionDraft.whenAbsent}
+        onTaskChange={setTask}
+        draft={draft}
+        onDraftChange={(patch) => { clearFeedback(); updateDraft(patch) }}
+        condition={conditionDraft.value}
+        onConditionChange={conditionDraft.update}
         listValue={listDraft.value}
         onListChange={listDraft.update}
-        keyValue={key}
-        swipeFrom={swipeFrom}
-        swipeTo={swipeTo}
-        swipeDuration={swipeDuration}
         snapshot={snapshot}
         selectedNode={selectedNode}
         selectedPoint={selectedPoint}
         selector={selector}
         hoverNode={hoverNode}
-        isConnected={connected}
-        isRunning={running}
-        submission={submission}
-        onTaskChange={setTask}
-        onActionChange={(next) => { clearFeedback(); setAction(next) }}
-        onTextChange={setText}
-        onTimeoutChange={setTimeoutValue}
-        onExistsChange={setExists}
-        onConditionModeChange={conditionDraft.setMode}
-        onRepeatCountChange={conditionDraft.setRepeatCount}
-        onMaxChecksChange={conditionDraft.setMaxChecks}
-        onIntervalMsChange={conditionDraft.setIntervalMs}
-        onWhenPresentChange={conditionDraft.setWhenPresent}
-        onWhenAbsentChange={conditionDraft.setWhenAbsent}
-        onKeyChange={setKey}
-        onSwipeFromChange={setSwipeFrom}
-        onSwipeToChange={setSwipeTo}
-        onSwipeDurationChange={setSwipeDuration}
         onSelectorChange={(next) => { clearFeedback(); setSelector(next) }}
         onSelectNode={selectNode}
         onHoverNode={setHoverNode}
+        isConnected={connected}
+        isRunning={running}
+        submission={submission}
         onAddStep={() => void submit()}
         onCancelEdit={startNewStep}
       />
     </main>}
-    {runReview && active && <div className="modal-backdrop" role="presentation" onClick={() => setRunReview(null)}>
-      <section className="run-review" role="dialog" aria-modal="true" aria-label="核对运行目标" onClick={(event) => event.stopPropagation()}>
-        <h3>核对运行目标</h3><p>任务“{task.name}”将独立并行运行在以下 {targets.length} 台设备：</p>
-        <ul>{targets.map((serial) => <li key={serial}>{devices.find((device) => device.serial === serial)?.model || '设备'} <small>{serial}</small></li>)}</ul>
-        <div className="review-actions"><button onClick={() => setRunReview(null)}>返回</button><button className="primary" onClick={() => { const action = runReview === 'save-run' ? saveAndRun : run; setRunReview(null); void action() }}>确认运行</button></div>
-      </section>
-    </div>}
+    {runReview && active && <RunReviewDialog
+      task={task} devices={devices} targets={targets}
+      onCancel={() => setRunReview(null)}
+      onConfirm={() => { const action = runReview === 'save-run' ? saveAndRun : run; setRunReview(null); void action() }}
+    />}
   </div>
 }
 

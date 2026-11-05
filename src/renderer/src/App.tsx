@@ -2,7 +2,8 @@
  * 应用导航组合层：保持设备会话和运行批次摘要，并切换三个工作页面。
  */
 import { useEffect, useState } from 'react'
-import type { BatchSummary } from '../../shared/types'
+import type { AutomationTask, BatchSummary, PendingRun } from '../../shared/types'
+import { primaryRunSerial } from '../../shared/monitor-model'
 import { DeviceManagerPage } from './components/device-manager-page'
 import { RunMonitorPage } from './components/run-monitor-page'
 import { TaskEditorPage } from './components/task-editor-page'
@@ -19,6 +20,7 @@ export default function App() {
   const [page, setPage] = useState<Page>('editor')
   const [message, setMessage] = useState('请在设备管理页连接设备。')
   const [batch, setBatch] = useState<BatchSummary | null>(null)
+  const [pendingRun, setPendingRun] = useState<PendingRun | null>(null)
   const fleet = useDeviceFleet(setMessage)
   const running = Boolean(batch && !batch.finishedAt)
 
@@ -46,11 +48,42 @@ export default function App() {
     catch (error) { setMessage(errorText(error)) }
   }
 
+  /** 运行准备：先切工作台建立投屏，首要设备出画面后才下发任务（use-pending-run 编排）。 */
+  function prepareRun(task: AutomationTask, targets: string[]): void {
+    setPendingRun({ task, targets, primary: primaryRunSerial(targets, fleet.focused || null) })
+    setPage('monitor')
+  }
+
+  /** 用户在准备期主动取消：不下发任务。 */
+  function cancelPendingRun(): void {
+    setPendingRun(null)
+    setMessage('已取消运行准备。')
+  }
+
+  /** 任务已真正下发并创建批次：退出准备态并展示新批次。 */
+  function launchRun(batch: BatchSummary): void {
+    setPendingRun(null)
+    setBatch(batch)
+    setMessage(`任务已开始运行：${batch.devices.length} 台设备。`)
+  }
+
+  /** 下发失败：退出准备态并显式报错，不允许静默停留在等待中。 */
+  function failRun(message: string): void {
+    setPendingRun(null)
+    setMessage(message)
+  }
+
+  /** 切页；准备期离开工作台视为取消，避免任务在无人监看时突然下发。 */
+  function switchPage(next: Page): void {
+    if (next !== 'monitor' && pendingRun) cancelPendingRun()
+    setPage(next)
+  }
+
   return <div className="app">
     <header className="topbar">
       <div className="brand"><img src={droidstageIcon} alt="" /><h1>卓序</h1></div>
       <nav className="page-tabs" aria-label="主页面">
-        {PAGES.map((item) => <button key={item.id} className={page === item.id ? 'active' : ''} aria-current={page === item.id ? 'page' : undefined} onClick={() => setPage(item.id)}>{item.label}{item.id === 'monitor' && running && <span className="nav-live" />}</button>)}
+        {PAGES.map((item) => <button key={item.id} className={page === item.id ? 'active' : ''} aria-current={page === item.id ? 'page' : undefined} onClick={() => switchPage(item.id)}>{item.label}{item.id === 'monitor' && running && <span className="nav-live" />}</button>)}
       </nav>
       <div className="top-summary"><span>{fleet.connectedSerials.length} 台已连接</span><span className={running ? 'running' : ''}>{running ? '任务运行中' : '空闲'}</span></div>
     </header>
@@ -58,11 +91,13 @@ export default function App() {
     <TaskEditorPage
       active={page === 'editor'} devices={fleet.devices} connectedSerials={fleet.connectedSerials}
       focused={fleet.focused} targets={fleet.targets} running={running} setFocused={fleet.setFocused}
-      setMessage={setMessage} onShowDevices={() => setPage('devices')}
-      onBatchStarted={(record) => { setBatch(record); setPage('monitor') }}
+      setMessage={setMessage} onShowDevices={() => switchPage('devices')}
+      onRunPrepared={prepareRun}
     />
-    {page === 'devices' && <DeviceManagerPage fleet={fleet} batch={batch} onFocus={(serial) => { fleet.setFocused(serial); setPage('editor') }} />}
-    {page === 'monitor' && <RunMonitorPage batch={batch} devices={fleet.devices} connectedSerials={fleet.connectedSerials} onCancel={(serial) => void cancel(serial)} onOpenResult={(directory) => void window.androidAutoDesk.openRunDir(directory).catch((error) => setMessage(errorText(error)))} onError={setMessage} />}
+    {page === 'devices' && <DeviceManagerPage fleet={fleet} batch={batch} onFocus={(serial) => { fleet.setFocused(serial); switchPage('editor') }} />}
+    {page === 'monitor' && <RunMonitorPage batch={batch} devices={fleet.devices} connectedSerials={fleet.connectedSerials} pendingRun={pendingRun}
+      onRunLaunched={launchRun} onRunLaunchFailed={failRun} onPendingCancel={cancelPendingRun}
+      onCancel={(serial) => void cancel(serial)} onOpenResult={(directory) => void window.androidAutoDesk.openRunDir(directory).catch((error) => setMessage(errorText(error)))} onError={setMessage} />}
 
     <div className="app-status" role="status"><span className="status-dot" />{message}{message.includes('驱动') && <a href="https://developer.android.com/studio/run/oem-usb" target="_blank" rel="noreferrer">厂商驱动说明</a>}</div>
   </div>

@@ -65,6 +65,32 @@
   gap: 8px
 }
 
+/* 运行准备横幅：投屏建流期间告知任务尚未下发，并保留取消入口 */
+.monitor-pending {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 14px;
+  background: #fff;
+  border: 1px solid #e0eafa;
+  border-radius: 10px;
+  color: #173258;
+  font-size: 13px
+}
+
+.monitor-pending .pending-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #f2a124
+}
+
+.monitor-pending button {
+  margin-left: auto;
+  font-size: 11px;
+  padding: 6px 10px
+}
+
 .monitor-count {
   display: flex;
   align-items: baseline;

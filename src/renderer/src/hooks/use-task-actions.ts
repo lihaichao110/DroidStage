@@ -2,17 +2,16 @@
  * 任务文件与运行操作：集中处理校验、保存取消和执行状态。
  */
 import type { Dispatch, SetStateAction } from 'react'
-import type { AutomationTask, BatchSummary } from '../../../shared/types'
+import type { AutomationTask } from '../../../shared/types'
 import { validateTask } from '../../../shared/task'
 
 type TaskActionsState = {
   task: AutomationTask
   setTask: Dispatch<SetStateAction<AutomationTask>>
-  setEditingId: Dispatch<SetStateAction<string | null>>
   setMessage: (message: string) => void
   onTaskLoaded: () => void
   targets: string[]
-  onBatchStarted: (batch: BatchSummary) => void
+  onRunPrepared: (task: AutomationTask, targets: string[]) => void
 }
 
 /**
@@ -20,7 +19,7 @@ type TaskActionsState = {
  * @param state 当前任务及状态更新函数
  * @returns 保存、载入、运行与组合操作
  */
-export function useTaskActions({ task, setTask, setEditingId, setMessage, onTaskLoaded, targets, onBatchStarted }: TaskActionsState) {
+export function useTaskActions({ task, setTask, setMessage, onTaskLoaded, targets, onRunPrepared }: TaskActionsState) {
   /** 保存任务，并在校验失败时显示错误。 */
   async function save(): Promise<void> {
     try {
@@ -30,23 +29,22 @@ export function useTaskActions({ task, setTask, setEditingId, setMessage, onTask
     } catch (error) { setMessage(errorText(error)) }
   }
 
-  /** 载入任务后退出旧步骤的编辑状态。 */
+  /** 载入任务后经 onTaskLoaded 退出旧步骤的编辑并清空草稿。 */
   async function load(): Promise<void> {
     try {
       const result = await window.androidAutoDesk.loadTask()
-      if (result) { setTask(result); setEditingId(null); onTaskLoaded(); setMessage('任务已载入。') }
+      if (result) { setTask(result); onTaskLoaded(); setMessage('任务已载入。') }
     } catch (error) { setMessage(errorText(error)) }
   }
 
-  /** 清空旧记录并运行已校验的任务。 */
+  /** 校验后进入运行准备：先切工作台建投屏，画面就绪后再下发任务（见 use-pending-run）。 */
   async function run(): Promise<void> {
     try {
       validateTask(task)
       if (!task.steps.length) throw new Error('请先添加至少一个步骤')
       if (!targets.length) throw new Error('请先选择运行目标设备')
-      const batch = await window.androidAutoDesk.runTask(task, targets)
-      onBatchStarted(batch)
-      setMessage(`任务已开始运行：${targets.length} 台设备。`)
+      onRunPrepared(task, targets)
+      setMessage('已提交运行，画面就绪后自动开始。')
     } catch (error) { setMessage(errorText(error)) }
   }
 

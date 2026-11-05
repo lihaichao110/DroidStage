@@ -2,16 +2,21 @@
  * 运行工作台：把批次状态、按需投屏和逐设备日志汇于同一页面。
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { BatchSummary, Device, RunEvent } from '../../../shared/types'
-import { monitorCounts, monitorRows, preferredMonitorSerial, STATUS_LABELS, type MonitorFilter } from '../../../shared/monitor-model'
+import type { BatchSummary, Device, PendingRun, RunEvent } from '../../../shared/types'
+import { monitorCounts, monitorRows, pendingPreviewSerials, preferredMonitorSerial, STATUS_LABELS, type MonitorFilter } from '../../../shared/monitor-model'
 import { MonitorDeviceList } from './monitor-device-list'
 import { MonitorPreview } from './monitor-preview'
 import { MonitorDetail } from './monitor-detail'
+import { usePendingRun } from '../hooks/use-pending-run'
 
 type Props = {
   batch: BatchSummary | null
   devices: Device[]
   connectedSerials: string[]
+  pendingRun: PendingRun | null
+  onRunLaunched: (batch: BatchSummary) => void
+  onRunLaunchFailed: (message: string) => void
+  onPendingCancel: () => void
   onCancel: (serial?: string) => void
   onOpenResult: (directory: string) => void
   onError: (message: string) => void
@@ -24,13 +29,14 @@ const COUNT_ORDER = ['pending', 'running', 'success', 'partial', 'failure', 'can
  * @param props 当前批次、设备及操作回调
  * @returns 可监看大量设备的工作页面
  */
-export function RunMonitorPage({ batch, devices, connectedSerials, onCancel, onOpenResult, onError }: Props) {
+export function RunMonitorPage({ batch, devices, connectedSerials, pendingRun, onRunLaunched, onRunLaunchFailed, onPendingCancel, onCancel, onOpenResult, onError }: Props) {
   const [history, setHistory] = useState<BatchSummary[]>([])
   const [nextPage, setNextPage] = useState(0)
   const [hasMore, setHasMore] = useState(false)
   const [isLoadingHistory, setLoadingHistory] = useState(false)
   const [selectedBatchId, setSelectedBatchId] = useState(batch?.id ?? 'live')
-  const [selectedSerial, setSelectedSerial] = useState(preferredMonitorSerial(batch))
+  // 准备期直接锚定首要监看设备，让详情与画面从第一秒就对准将开跑的设备
+  const [selectedSerial, setSelectedSerial] = useState(pendingRun ? pendingRun.primary : preferredMonitorSerial(batch))
   const [pinnedSerials, setPinnedSerials] = useState<string[]>([])
   const [scope, setScope] = useState<'batch' | 'all'>(batch ? 'batch' : 'all')
   const [filter, setFilter] = useState<MonitorFilter>('all')
@@ -72,11 +78,13 @@ export function RunMonitorPage({ batch, devices, connectedSerials, onCancel, onO
   const isActive = Boolean(record && record.id === batch?.id && !record.finishedAt)
 
   // 只有批次切换才重置选择；排序、筛选和进度更新都不得抢走当前设备。
+  // 准备期保持锚定首要设备，待任务真正建立（准备态清空）后再按批次定位。
   useEffect(() => {
+    if (pendingRun) return
     setScope(record ? 'batch' : 'all')
     setSelectedSerial(record ? preferredMonitorSerial(record) : connectedSerials[0] ?? '')
     setPinnedSerials([])
-  }, [selectedBatchId, record?.id])
+  }, [selectedBatchId, record?.id, pendingRun])
   useEffect(() => {
     if (selectedBatchId === 'live' && selectedSerial && !connectedSerials.includes(selectedSerial)) {
       setSelectedSerial(connectedSerials[0] ?? '')
@@ -89,6 +97,13 @@ export function RunMonitorPage({ batch, devices, connectedSerials, onCancel, onO
     const timer = window.setInterval(() => setNow(Date.now()), 1000)
     return () => window.clearInterval(timer)
   }, [])
+
+  // 准备编排：首要设备出画面（或失败/超时）后任务才真正下发；照常运行的提示走底部状态栏
+  const isLaunching = usePendingRun(pendingRun, connectedSerials, {
+    onLaunched: onRunLaunched,
+    onLaunchFailed: onRunLaunchFailed,
+    onNotice: onError
+  })
 
   // 先订阅增量事件再取历史；取数期间到达的事件按内容去重合并，避免丢日志。
   useEffect(() => {
@@ -134,7 +149,10 @@ export function RunMonitorPage({ batch, devices, connectedSerials, onCancel, onO
   const allRows = monitorRows(record, devices, connectedSerials, scope, 'all', '')
   const selectedRow = allRows.find((row) => row.serial === selectedSerial) ?? null
   const run = record?.devices.find((item) => item.serial === selectedSerial) ?? null
-  const previewSerials = isHistory ? [] : [selectedSerial, ...pinnedSerials.filter((serial) => serial !== selectedSerial)].filter(Boolean)
+  // 准备期画面固定为目标设备（首要置顶，最多 4 路），不随选中/固定状态变化，保证开跑前就能看到它们建流
+  const previewSerials = pendingRun
+    ? pendingPreviewSerials(pendingRun.targets, pendingRun.primary)
+    : isHistory ? [] : [selectedSerial, ...pinnedSerials.filter((serial) => serial !== selectedSerial)].filter(Boolean)
   const counts = monitorCounts(record)
   const elapsed = record ? Math.max(0, Math.floor(((record.finishedAt ? Date.parse(record.finishedAt) : now) - Date.parse(record.startedAt)) / 1000)) : 0
 
@@ -170,6 +188,11 @@ export function RunMonitorPage({ batch, devices, connectedSerials, onCancel, onO
         {isActive && <button onClick={() => onCancel()}>完成当前步骤后取消整批</button>}
       </div>
     </div>
+    {pendingRun && <div className="monitor-pending" role="status">
+      <span className="pending-dot" aria-hidden="true" />
+      <span>{isLaunching ? '画面已就绪，任务启动中…' : '正在建立投屏，画面就绪后任务自动开始'}</span>
+      <button onClick={onPendingCancel} disabled={isLaunching}>取消运行</button>
+    </div>}
     {record && <div className="monitor-counts" aria-label="批次状态统计">
       {COUNT_ORDER.map((status) => <span key={status} className={`monitor-count run-${status}`}><b>{counts[status]}</b>{STATUS_LABELS[status]}</span>)}
     </div>}
@@ -177,7 +200,7 @@ export function RunMonitorPage({ batch, devices, connectedSerials, onCancel, onO
       <MonitorDeviceList rows={rows} selectedSerial={selectedSerial} pinnedSerials={pinnedSerials} scope={scope} filter={filter} query={query}
         hasBatch={Boolean(record)} canPin={pinnedSerials.length < 3} showPin={!isHistory} onScope={setScope} onFilter={setFilter} onQuery={setQuery} onSelect={setSelectedSerial} onTogglePin={togglePin} />
       <MonitorPreview serials={previewSerials} devices={devices} connectedSerials={connectedSerials} pinnedSerials={pinnedSerials}
-        selectedSerial={selectedSerial} isHistory={isHistory} onUnpin={togglePin} />
+        selectedSerial={selectedSerial} isHistory={isHistory && !pendingRun} onUnpin={togglePin} />
       <MonitorDetail row={selectedRow} run={run} events={events} loading={isLoadingEvents} error={eventError} isActive={isActive}
         onCancel={onCancel} onOpenResult={onOpenResult} />
     </div>

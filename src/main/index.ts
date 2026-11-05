@@ -1,7 +1,7 @@
 /**
  * 桌面主进程入口：创建窗口并注册设备、任务与结果目录相关的 IPC。
  */
-import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from 'electron'
 import { readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { existsSync, mkdirSync } from 'node:fs'
@@ -46,6 +46,12 @@ function createWindow(): void {
   })
   if (process.env.ELECTRON_RENDERER_URL) window.loadURL(process.env.ELECTRON_RENDERER_URL)
   else window.loadFile(path.join(__dirname, '../renderer/index.html'))
+  window.webContents.on('before-input-event', (_event, input) => {
+    // 默认菜单移除后 F12 / Ctrl+Shift+I 不再生效，开发期保留打开 DevTools 的入口
+    if (process.env.ELECTRON_RENDERER_URL && input.type === 'keyDown' && input.key === 'F12') {
+      window?.webContents.toggleDevTools()
+    }
+  })
   window.webContents.setWindowOpenHandler(({ url }) => {
     if (url === 'https://developer.android.com/studio/run/oem-usb') shell.openExternal(url)
     return { action: 'deny' }
@@ -58,6 +64,8 @@ mkdirSync(userDataPath, { recursive: true })
 app.setPath('userData', userDataPath)
 
 app.whenReady().then(() => {
+  // 移除 Electron 默认菜单栏（File/Edit/View/Window）：对本工具无意义，还会带入刷新、缩放等误触快捷键
+  Menu.setApplicationMenu(null)
   createWindow()
   ipcMain.handle('devices:list', async () => {
     // 手机端直连在 ADB 未安装或不可用时仍须显示；USB 发现失败不应挡住已配对设备。

@@ -2,7 +2,7 @@
  * 运行工作台列表测试：三十台设备的状态统计、异常优先排序与搜索筛选。
  */
 import { describe, expect, it } from 'vitest'
-import { monitorCounts, monitorRows, preferredMonitorSerial } from '../src/shared/monitor-model'
+import { monitorCounts, monitorRows, pendingPreviewSerials, preferredMonitorSerial, primaryRunSerial } from '../src/shared/monitor-model'
 import type { BatchSummary, Device, DeviceRunStatus } from '../src/shared/types'
 
 const statuses: DeviceRunStatus[] = ['success', 'pending', 'running', 'partial', 'failure', 'cancelled']
@@ -31,5 +31,20 @@ describe('运行工作台设备模型', () => {
     expect(monitorRows(batch, devices, connected, 'batch', 'failure', '型号 4')).toMatchObject([
       { serial: 'serial-04', status: 'failure' }
     ])
+  })
+})
+
+describe('运行准备期的首要设备与画面列表', () => {
+  it('焦点设备在目标内则作为首要设备，否则回退第一台目标', () => {
+    expect(primaryRunSerial(['serial-a', 'serial-b'], 'serial-b')).toBe('serial-b')
+    expect(primaryRunSerial(['serial-a', 'serial-b'], 'serial-x')).toBe('serial-a')
+    expect(primaryRunSerial(['serial-a', 'serial-b'], null)).toBe('serial-a')
+    expect(primaryRunSerial([], 'serial-a')).toBe('')
+  })
+
+  it('准备期画面首要设备置顶且最多 4 路', () => {
+    expect(pendingPreviewSerials(['serial-a', 'serial-b', 'serial-c'], 'serial-b')).toEqual(['serial-b', 'serial-a', 'serial-c'])
+    expect(pendingPreviewSerials(['serial-a', 'serial-b', 'serial-c', 'serial-d', 'serial-e'], 'serial-a')).toEqual(['serial-a', 'serial-b', 'serial-c', 'serial-d'])
+    expect(pendingPreviewSerials(['serial-a'], 'serial-a')).toEqual(['serial-a'])
   })
 })

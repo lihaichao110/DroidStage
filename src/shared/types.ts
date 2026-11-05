@@ -137,6 +137,14 @@ export type BatchRecord = {
 export type BatchSummary = Omit<BatchRecord, 'events'>
 export type BatchPage = { items: BatchSummary[]; hasMore: boolean }
 
+/** 已确认运行、等待投屏就绪后再下发的准备态；由渲染层编排，主进程不感知。 */
+export type PendingRun = {
+  task: AutomationTask
+  targets: string[]
+  /** 首要监看设备：其投屏出画面后任务才开始下发。 */
+  primary: string
+}
+
 export type AppApi = {
   listDevices(): Promise<Device[]>
   installCompanion(serial: string): Promise<void>
