@@ -92,6 +92,11 @@ class AgentTest {
             }
             "count" -> countMatches(args.getJSONObject("selector"), args.optLong("waitMs", 0L))
             "inspectMatches" -> locator.inspect(args.getJSONObject("selector"))
+            "swipeRelative" -> RelativeSwipe.execute(args, { SwipeDisplay(device.displayWidth, device.displayHeight, device.displayRotation) }, { selector, timeout ->
+                locator.findUnique(selector, timeout).visibleBounds.let { SwipeBounds(it.left, it.top, it.right, it.bottom) }
+            }, { from, to, duration ->
+                if (!device.swipe(from.x, from.y, to.x, to.y, (duration / 5).toInt().coerceAtLeast(1))) error("滑动失败")
+            })
             "scanRows" -> if (args.optString("mode") == "rowState") stateRows.scan(args) else lists.scan(args)
             "tapRow" -> if (args.optString("mode") == "rowState") stateRows.tap(args) else lists.tap(args)
             "scrollList" -> lists.scroll(args)

@@ -8,6 +8,7 @@ import type { ConditionDraft } from '../hooks/use-condition-draft'
 
 type ConditionEditorProps = {
   selector: Selector | null
+  pickedSelector?: Selector | null
   onSelectorChange: (selector: Selector | null) => void
   value: ConditionDraft
   onChange: (patch: Partial<ConditionDraft>) => void
@@ -48,7 +49,7 @@ export function ConditionEditor(props: ConditionEditorProps) {
       <label className="setting-field">重查前等待（毫秒）<input type="number" min="100" max="60000" value={intervalMs} onChange={(event) => props.onChange({ intervalMs: Number(event.target.value) })} /></label>
     </div>}
     {mode === 'repeatUntilPresent' && <p className="condition-hint">最后一次仍未找到时，任务会报错，不再执行“不存在时”动作。</p>}
-    <BranchActions label="存在时" actions={whenPresent} onChange={(steps) => props.onChange({ whenPresent: steps })} conditionSelector={selector} onDraftChange={(isEditing) => setEditing((current) => ({ ...current, present: isEditing }))} />
-    <BranchActions label="不存在时" actions={whenAbsent} onChange={(steps) => props.onChange({ whenAbsent: steps })} conditionSelector={selector} onDraftChange={(isEditing) => setEditing((current) => ({ ...current, absent: isEditing }))} />
+    <BranchActions label="存在时" actions={whenPresent} onChange={(steps) => props.onChange({ whenPresent: steps })} conditionSelector={selector} pickedSelector={props.pickedSelector} onDraftChange={(isEditing) => setEditing((current) => ({ ...current, present: isEditing }))} />
+    <BranchActions label="不存在时" actions={whenAbsent} onChange={(steps) => props.onChange({ whenAbsent: steps })} conditionSelector={selector} pickedSelector={props.pickedSelector} onDraftChange={(isEditing) => setEditing((current) => ({ ...current, absent: isEditing }))} />
   </div>
 }

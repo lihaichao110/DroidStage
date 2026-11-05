@@ -1,0 +1,19 @@
+/**
+ * 目标应用选择器样式：与设置表单保持一致，并让浮层避开滚动区域裁切。
+ */
+.app-package-control{position:relative;margin-top:7px}
+.app-package-field .app-package-control input{margin-top:0;padding-right:66px;text-overflow:ellipsis}
+.app-package-buttons{position:absolute;inset:0 5px 0 auto;display:flex;align-items:center;gap:2px}
+.app-package-buttons button{display:grid;place-items:center;width:26px;height:27px;padding:0;border:0;border-radius:5px;background:transparent;color:#7388a5;font-size:17px;line-height:1}
+.app-package-buttons button:focus-visible{outline:2px solid #3185ff;outline-offset:1px}
+.app-package-menu{position:fixed;z-index:15;overflow:auto;overscroll-behavior:contain;margin:0;padding:4px;list-style:none;border:1px solid #d6e3f5;border-radius:9px;background:#fff;box-shadow:0 8px 24px #19345e24}
+.app-package-option{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 10px;border-radius:6px;cursor:pointer;font-size:13px;color:#182c50}
+.app-package-option.active{background:#eef6ff}
+.app-package-option[aria-selected=true]{color:#0875f8}
+.app-package-option>span:first-child{min-width:0}
+.app-package-option strong,.app-package-option small{display:block}
+.app-package-option small{margin-top:3px;font-size:11px;font-weight:400;color:#7d8fa9;overflow-wrap:anywhere}
+.app-package-check{flex:none;font-size:16px}
+.app-package-empty{padding:12px 10px;font-size:12px;font-weight:400;color:#7d8fa9;line-height:1.6}
+.app-package-hint{margin:7px 0 0;font-size:11px;font-weight:400;color:#8192aa;line-height:1.6}
+[inert] .app-package-menu{display:none}

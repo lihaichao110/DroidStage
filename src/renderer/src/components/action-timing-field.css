@@ -1,0 +1,5 @@
+/* 动作时间行：窄面板自然换行，复选框不继承时间输入的满宽样式。 */
+.action-timing-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 12px; }
+.action-timing-toggle { display: inline-flex; align-items: center; gap: 5px; font-weight: 500; cursor: pointer; }
+.setting-field .action-timing-toggle input[type="checkbox"] { display: inline-block; flex: none; width: 14px; height: 14px; margin: 0; padding: 0; accent-color: #0875f8; }
+.action-timing-hint { margin: 7px 0 0; color: #788baa; font-size: 11px; font-weight: 400; line-height: 1.6; }

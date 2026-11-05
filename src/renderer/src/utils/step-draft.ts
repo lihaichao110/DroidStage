@@ -1,7 +1,9 @@
 /**
  * 步骤草稿纯逻辑：定义编辑草稿结构，并把已保存步骤回填为带默认值的草稿。
  */
-import type { Point, Step } from '../../../shared/types'
+import type { Step } from '../../../shared/types'
+import { emptySwipeDraft, swipeDraftFromStep } from './swipe-draft'
+import type { SwipeDraft } from './swipe-draft'
 
 /** 步骤草稿：单一对象承载全部动作类型的输入，提交时按当前动作取用字段。 */
 export type StepDraft = {
@@ -10,24 +12,22 @@ export type StepDraft = {
   action: Step['type']
   text: string
   timeoutMs: number
+  hasRandomDelay: boolean
   exists: boolean
   key: 'back' | 'home'
-  swipeFrom: Point
-  swipeTo: Point
-  swipeDurationMs: number
+  swipe: SwipeDraft
 }
 
-/** 新建步骤的初始草稿；滑动默认为向上滑半屏，便于直接微调。 */
+/** 新建步骤的初始草稿；滑动默认为按屏幕比例向上滑动，便于直接微调。 */
 export const emptyDraft: StepDraft = {
   editingId: null,
   action: 'tap',
   text: '',
   timeoutMs: 10000,
+  hasRandomDelay: false,
   exists: true,
   key: 'back',
-  swipeFrom: { x: 300, y: 700 },
-  swipeTo: { x: 300, y: 300 },
-  swipeDurationMs: 500
+  swipe: emptySwipeDraft()
 }
 
 /**
@@ -40,13 +40,35 @@ export function draftFromStep(step: Step): StepDraft {
     ...emptyDraft,
     editingId: step.id,
     action: step.type,
+    hasRandomDelay: 'hasRandomDelay' in step && step.hasRandomDelay === true,
     text: step.type === 'input' ? step.text : emptyDraft.text,
     // assert/screenshot/key/条件等步骤没有超时字段，回落默认而不是沿用上一次编辑的残值
-    timeoutMs: 'timeoutMs' in step ? step.timeoutMs : emptyDraft.timeoutMs,
+    timeoutMs: 'timeoutMs' in step && typeof step.timeoutMs === 'number' ? step.timeoutMs : emptyDraft.timeoutMs,
     exists: step.type === 'wait' || step.type === 'assert' ? step.exists : emptyDraft.exists,
     key: step.type === 'key' ? step.key : emptyDraft.key,
-    swipeFrom: step.type === 'swipe' ? step.from : emptyDraft.swipeFrom,
-    swipeTo: step.type === 'swipe' ? step.to : emptyDraft.swipeTo,
-    swipeDurationMs: step.type === 'swipe' ? step.durationMs : emptyDraft.swipeDurationMs
+    swipe: step.type === 'swipe' ? swipeDraftFromStep(step) : emptySwipeDraft()
   }
+}
+
+/**
+ * 仅给支持的动作保存随机开关，避免切换动作后把隐藏的勾选状态写入无关步骤。
+ * @param step 当前动作构建出的步骤
+ * @param hasRandomDelay 是否启用动作前随机停顿
+ * @returns 开关关闭时省略可选字段的步骤
+ */
+export function withRandomDelay<T extends Step>(step: T, hasRandomDelay: boolean): T {
+  if (step.type !== 'tap' && step.type !== 'input' && step.type !== 'swipe') return step
+  const { hasRandomDelay: _previous, ...base } = step
+  return { ...base, ...(hasRandomDelay ? { hasRandomDelay: true } : {}) } as T
+}
+
+/**
+ * 更新草稿时让新动作恢复默认关闭，防止编辑或连续添加时继承上一动作的勾选。
+ * @param current 原草稿
+ * @param patch 要修改的字段
+ * @returns 保留其他输入的新草稿
+ */
+export function patchDraft(current: StepDraft, patch: Partial<StepDraft>): StepDraft {
+  const isNewAction = patch.editingId === null || patch.action !== undefined && patch.action !== current.action
+  return { ...current, hasRandomDelay: isNewAction ? false : current.hasRandomDelay, ...patch }
 }

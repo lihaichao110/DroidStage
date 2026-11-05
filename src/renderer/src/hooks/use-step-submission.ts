@@ -6,7 +6,9 @@ import type { Dispatch, SetStateAction } from 'react'
 import type { AutomationTask, ConditionStep, ListClickStep, Point, Selector, Step, UiNode } from '../../../shared/types'
 import { crossAppWarning, validateSelector, validateTask } from '../../../shared/task'
 import { listPreviewIssue } from '../../../shared/list-preview'
+import { buildSwipeStep } from '../utils/swipe-draft'
 import type { StepDraft } from '../utils/step-draft'
+import { withRandomDelay } from '../utils/step-draft'
 
 export type StepSubmissionState =
   | { phase: 'idle' }
@@ -60,7 +62,7 @@ export function useStepSubmission(deps: SubmissionDeps) {
     if (pendingRef.current) return
     pendingRef.current = true
     const { task, focused, connected, draft, pick } = deps
-    const { editingId, action, timeoutMs, text, exists, key: keyValue, swipeFrom, swipeTo, swipeDurationMs } = draft
+    const { editingId, action, timeoutMs, text, exists, key: keyValue } = draft
     const { selector, selectedNode, selectedPoint } = pick
     const needsCount = Boolean(selector) && (
       action === 'tap' || action === 'input' || action === 'wait' ||
@@ -86,7 +88,7 @@ export function useStepSubmission(deps: SubmissionDeps) {
         if (count !== 1) throw new SelectorMatchError(`当前定位条件匹配 ${count} 个控件，需要恰好 1 个。请更换更精确的定位方式`)
         step = { id, type: 'input', selector, text, timeoutMs }
       } else if (action === 'swipe') {
-        step = { id, type: 'swipe', from: swipeFrom, to: swipeTo, durationMs: swipeDurationMs }
+        step = buildSwipeStep(id, draft.swipe)
       } else if (action === 'wait' || action === 'assert') {
         if (!selector) throw new Error('先选择可定位控件')
         const count = await window.androidAutoDesk.count(focused, selector)
@@ -115,6 +117,7 @@ export function useStepSubmission(deps: SubmissionDeps) {
         step = { id, type: 'key', key: keyValue }
       }
       if (focusedRef.current !== focused) throw new Error('编辑设备已变化，请重新校验后添加步骤')
+      step = withRandomDelay(step, draft.hasRandomDelay)
       const next = { ...task, steps: editingId ? task.steps.map((item) => item.id === editingId ? step : item) : [...task.steps, step] }
       validateTask(next)
       deps.setTask(next)

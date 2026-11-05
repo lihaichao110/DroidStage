@@ -39,11 +39,11 @@ describe('任务格式', () => {
     ] })).toThrow()
   })
 
-  it('兼容旧版任务，并接受空分支及手填的当前不存在目标', () => {
+  it('接受条件任务、空分支及手填的当前不存在目标', () => {
     const steps = [
       { id: 'old', type: 'assert', selector: { kind: 'text', value: '旧步骤' }, exists: false },
       { id: 'condition', type: 'condition', selector: { kind: 'text', value: '关注' }, mode: 'repeatUntilPresent', maxChecks: 20, intervalMs: 1000,
-        whenPresent: [], whenAbsent: [{ id: 'swipe', type: 'swipe', from: { x: 300, y: 700 }, to: { x: 300, y: 300 }, durationMs: 500 }] }
+        whenPresent: [], whenAbsent: [{ id: 'swipe', type: 'swipe', coordinateMode: 'screenPercent', from: { x: 50, y: 80 }, to: { x: 50, y: 20 }, durationMs: 500 }] }
     ]
     const task = { version: 1, name: '找关注按钮', steps }
     expect(() => validateTask(task)).not.toThrow()

@@ -1,0 +1,26 @@
+/* 滑动编辑器：由布局间距隔开表单和说明，避免提示换行后被负边距覆盖。 */
+.swipe-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* 使用统一间距，避免普通步骤与分支末项的外边距规则造成显示差异。 */
+.swipe-editor > .setting-field,
+.swipe-editor > .swipe-grid > .setting-field {
+  margin: 0;
+}
+
+.swipe-editor > .swipe-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 10px;
+}
+
+.swipe-hint {
+  margin: 0;
+  color: #7185a5;
+  font-size: 11px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}

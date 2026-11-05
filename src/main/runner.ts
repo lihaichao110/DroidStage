@@ -10,8 +10,11 @@ import { flowStepNumber, stepSummary, validateTask } from '../shared/task'
 import type { DeviceSessionPort } from './session-port'
 import { runListClick } from './list-runner'
 import { listSummary } from './list-summary'
+import { executeSwipe } from './swipe-runner'
 
 const CONDITION_ONCE_WAIT_MS = 2000 // 判断一次时给动态页面留出控件树刷新时间，避免启动后立即误判不存在
+const RANDOM_DELAY_MIN_MS = 50 // 动作前随机停顿下限，单位为毫秒
+const RANDOM_DELAY_MAX_MS = 200 // 动作前随机停顿上限，包含此值
 
 export class TaskRunner {
   private cancelled = false
@@ -83,7 +86,8 @@ export class TaskRunner {
               ? `第 ${number} 步：成功点击 ${result.success} 次，跳过 ${result.skipped} 行次`
               : `第 ${number} 步：成功 ${result.success}，跳过 ${result.skipped}，原已完成 ${result.alreadyDone}`, index)
           } else {
-            await this.executeBasicStep(step, session, runDir, `step-${String(index + 1).padStart(3, '0')}`)
+            await this.executeBasicStep(step, session, runDir, `step-${String(index + 1).padStart(3, '0')}`,
+              (detail) => event('step', `第 ${number} 步：${detail}`, index))
           }
         } catch (error) {
           if (error instanceof CancelledError) throw error
@@ -158,7 +162,8 @@ export class TaskRunner {
       try {
         // 轮次和分支写入文件名，重复查找中的截图不会覆盖前一轮。
         const screenshotName = `${screenshotPrefix}-${label === '存在时' ? 'present' : 'absent'}-${String(check).padStart(3, '0')}-${String(childIndex + 1).padStart(3, '0')}`
-        await this.executeBasicStep(action, session, runDir, screenshotName)
+        await this.executeBasicStep(action, session, runDir, screenshotName,
+          (detail) => event('step', `第 ${number} 步${roundLabel}「${label}」第 ${childIndex + 1} 个动作：${detail}`, index))
       } catch (error) {
         if (error instanceof CancelledError) throw error
         throw new Error(`「${label}」分支第 ${childIndex + 1} 个动作（${stepSummary(action)}）失败：${error instanceof Error ? error.message : String(error)}`)
@@ -178,7 +183,15 @@ export class TaskRunner {
 
   private throwIfCancelled(): void { if (this.cancelled) throw new CancelledError() }
 
-  private async executeBasicStep(step: BasicStep, session: DeviceSessionPort, runDir: string, screenshotName: string): Promise<void> {
+  private async executeBasicStep(step: BasicStep, session: DeviceSessionPort, runDir: string, screenshotName: string, log: (detail: string) => Promise<void>): Promise<void> {
+    this.throwIfCancelled()
+    if ((step.type === 'tap' || step.type === 'input' || step.type === 'swipe') && step.hasRandomDelay) {
+      const delayMs = RANDOM_DELAY_MIN_MS + Math.floor(Math.random() * (RANDOM_DELAY_MAX_MS - RANDOM_DELAY_MIN_MS + 1))
+      await log(`动作前随机停顿 ${delayMs} 毫秒`)
+      // 在发命令之前等待，使控件查找超时与手势时长仍完全由原参数控制。
+      await this.waitRetry(delayMs)
+    }
+    this.throwIfCancelled()
     const agent = session.agent()
     switch (step.type) {
       case 'tap':
@@ -188,9 +201,11 @@ export class TaskRunner {
         // 手机端写入后会核对并可能聚焦重试，网络等待须覆盖这段额外时间。
         await agent.request('input', { selector: step.selector, text: step.text, timeoutMs: step.timeoutMs }, step.timeoutMs + 6000)
         return
-      case 'swipe':
-        await agent.request('swipe', { from: step.from, to: step.to, durationMs: step.durationMs })
+      case 'swipe': {
+        const detail = await executeSwipe(step, agent)
+        if (detail) await log(detail)
         return
+      }
       case 'wait':
         await agent.request('wait', { selector: step.selector, exists: step.exists, timeoutMs: step.timeoutMs }, step.timeoutMs + 3000)
         return

@@ -1,3 +1,6 @@
+/**
+ * 步骤草稿测试：验证编辑已有步骤时各动作字段的回填与隔离。
+ */
 import { describe, expect, it } from 'vitest'
 import { draftFromStep, emptyDraft } from '../src/renderer/src/utils/step-draft'
 import type { Step } from '../src/shared/types'
@@ -33,10 +36,10 @@ describe('步骤草稿回填', () => {
   })
 
   it('滑动步骤回填起终点与时长，按键回落默认', () => {
-    const draft = draftFromStep({ id: 's5', type: 'swipe', from: { x: 1, y: 2 }, to: { x: 3, y: 4 }, durationMs: 900 })
-    expect(draft.swipeFrom).toEqual({ x: 1, y: 2 })
-    expect(draft.swipeTo).toEqual({ x: 3, y: 4 })
-    expect(draft.swipeDurationMs).toBe(900)
+    const draft = draftFromStep({ id: 's5', type: 'swipe', coordinateMode: 'screenPercent', from: { x: 1, y: 2 }, to: { x: 3, y: 4 }, durationMs: 900 })
+    expect(draft.swipe.from).toEqual({ x: 1, y: 2 })
+    expect(draft.swipe.to).toEqual({ x: 3, y: 4 })
+    expect(draft.swipe.durationMs).toBe(900)
     expect(draft.key).toBe(emptyDraft.key)
   })
 

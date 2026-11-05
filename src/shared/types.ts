@@ -5,10 +5,27 @@ export type Selector = { kind: 'resourceId' | 'description' | 'text' | 'classNam
 export type Point = { x: number; y: number }
 export type Bounds = { left: number; top: number; right: number; bottom: number }
 
+/** 滑动只接受明确的比例模式，避免把旧像素坐标当成百分比执行。 */
+export type SwipeStep = {
+  id: string
+  type: 'swipe'
+  from: Point
+  to: Point
+  durationMs: number
+  /** 每次发送动作前随机停顿，缺省时维持原有执行节奏。 */
+  hasRandomDelay?: boolean
+} & (
+  | { coordinateMode: 'screenPercent'; container?: never; timeoutMs?: never }
+  | { coordinateMode: 'elementPercent'; container: Selector; timeoutMs: number }
+)
+
+/** 手机端确认比例手势完成后返回的实际执行区域与坐标。 */
+export type SwipeResult = { bounds: Bounds; from: Point; to: Point }
+
 export type BasicStep =
-  | { id: string; type: 'tap'; selector?: Selector; point?: Point; timeoutMs: number }
-  | { id: string; type: 'input'; selector: Selector; text: string; timeoutMs: number }
-  | { id: string; type: 'swipe'; from: Point; to: Point; durationMs: number }
+  | { id: string; type: 'tap'; selector?: Selector; point?: Point; timeoutMs: number; hasRandomDelay?: boolean }
+  | { id: string; type: 'input'; selector: Selector; text: string; timeoutMs: number; hasRandomDelay?: boolean }
+  | SwipeStep
   | { id: string; type: 'wait'; selector: Selector; exists: boolean; timeoutMs: number }
   | { id: string; type: 'assert'; selector: Selector; exists: boolean }
   | { id: string; type: 'screenshot' }

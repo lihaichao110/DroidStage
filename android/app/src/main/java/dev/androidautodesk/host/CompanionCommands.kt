@@ -26,6 +26,11 @@ internal object CompanionCommands {
                 count
             }
             "inspectMatches" -> AccessibilityBridge.inspect(args.getJSONObject("selector"))
+            "swipeRelative" -> RelativeSwipe.execute(args, { RelativeSwipe.readDisplay(context) }, { selector, timeout ->
+                val node = AccessibilityBridge.findUnique(selector, timeout)
+                if (!node.isVisibleToUser) error("滑动区域当前不可见")
+                AccessibilityBridge.bounds(node).let { SwipeBounds(it.left, it.top, it.right, it.bottom) }
+            }, { from, to, duration -> AccessibilityBridge.gesture(from.x.toFloat(), from.y.toFloat(), to.x.toFloat(), to.y.toFloat(), duration) })
             "tap" -> {
                 val selector = args.optJSONObject("selector")
                 if (selector != null) AccessibilityBridge.tap(AccessibilityBridge.findUnique(selector, args.optLong("timeoutMs", 10000)))

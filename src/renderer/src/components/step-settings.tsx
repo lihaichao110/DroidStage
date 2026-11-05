@@ -6,8 +6,11 @@ import type { AutomationTask, HierarchySnapshot, ListClickDraft, Point, Selector
 import { stepTypeOptions } from '../../../shared/task'
 import { ElementDetails } from './element-details'
 import { HierarchyTree } from './hierarchy-tree'
+import { SwipeEditor } from './swipe-editor'
+import { ActionTimingField } from './action-timing-field'
 import { ConditionEditor } from './condition-editor'
 import { ListClickEditor } from './list-click-editor'
+import { AppPackageSelect } from './app-package-select'
 import type { StepSubmissionState } from '../hooks/use-step-submission'
 import type { ConditionDraft } from '../hooks/use-condition-draft'
 import type { StepDraft } from '../utils/step-draft'
@@ -50,7 +53,7 @@ export function StepSettings(props: StepSettingsProps) {
   const [isBranchEditing, setBranchEditing] = useState(false)
   const elementRef = useRef<HTMLDivElement>(null)
   const { task, draft, snapshot, selectedNode, selectedPoint, selector, hoverNode, isConnected, isRunning, submission } = props
-  const { action, editingId, text, timeoutMs, exists, key: keyValue, swipeFrom, swipeTo, swipeDurationMs } = draft
+  const { action, editingId, text, timeoutMs, exists, key: keyValue } = draft
   const needsTarget = action === 'tap' || action === 'input' || action === 'wait' || action === 'assert' || action === 'condition'
   const isSubmitting = submission.phase === 'pending'
   const disabledReason = isRunning ? '任务运行中暂不能修改步骤。'
@@ -73,7 +76,7 @@ export function StepSettings(props: StepSettingsProps) {
       <div className="setting-group" inert={isSubmitting}>
         <h3>任务信息</h3>
         <label className="setting-field">任务名称<input value={task.name} onChange={(event) => props.onTaskChange({ ...task, name: event.target.value })} /></label>
-        <label className="setting-field">目标 App 包名 <span className="optional">（可选）</span><input placeholder="留空则不自动启动应用" value={task.packageName ?? ''} onChange={(event) => props.onTaskChange({ ...task, packageName: event.target.value.trim() })} /></label>
+        <AppPackageSelect value={task.packageName ?? ''} onChange={(packageName) => props.onTaskChange({ ...task, packageName })} />
       </div>
       <div className="setting-group" inert={isSubmitting}>
         <h3>动作类型</h3>
@@ -89,23 +92,19 @@ export function StepSettings(props: StepSettingsProps) {
           </div>
           <button onClick={showTarget}>选择</button>
         </div>}
-        {(action === 'tap' || action === 'input' || action === 'wait') && <label className="setting-field">超时（毫秒）<input type="number" min="100" max="60000" value={timeoutMs} onChange={(event) => props.onDraftChange({ timeoutMs: Number(event.target.value) })} /></label>}
+        {(action === 'tap' || action === 'input' || action === 'wait') && <ActionTimingField label="超时（毫秒）" value={timeoutMs} max={60000} onChange={(timeoutMs) => props.onDraftChange({ timeoutMs })}
+          hasRandomDelay={draft.hasRandomDelay} onRandomDelayChange={action === 'wait' ? undefined : (hasRandomDelay) => props.onDraftChange({ hasRandomDelay })} />}
         {action === 'input' && <label className="setting-field">输入内容<textarea rows={3} value={text} onChange={(event) => props.onDraftChange({ text: event.target.value })} /></label>}
         {(action === 'wait' || action === 'assert') && <label className="setting-field">校验条件<select value={exists ? 'present' : 'absent'} onChange={(event) => props.onDraftChange({ exists: event.target.value === 'present' })}><option value="present">控件存在且唯一</option><option value="absent">控件不存在</option></select></label>}
         {action === 'condition' && <ConditionEditor key={editingId ?? 'new'}
           selector={selector} onSelectorChange={props.onSelectorChange}
+          pickedSelector={selector}
           value={props.condition} onChange={props.onConditionChange}
           onEditingChange={setBranchEditing}
         />}
         {action === 'listClick' && <ListClickEditor serial={props.serial} isConnected={isConnected} value={props.listValue} selectedNode={selectedNode} nodes={snapshot?.nodes ?? NO_NODES} onChange={props.onListChange} />}
         {action === 'key' && <label className="setting-field">按键<select value={keyValue} onChange={(event) => props.onDraftChange({ key: event.target.value as 'back' | 'home' })}><option value="back">返回</option><option value="home">Home</option></select></label>}
-        {action === 'swipe' && <div className="swipe-grid">
-          <label className="setting-field">起点 X<input type="number" value={swipeFrom.x} onChange={(event) => props.onDraftChange({ swipeFrom: { ...swipeFrom, x: Number(event.target.value) } })} /></label>
-          <label className="setting-field">起点 Y<input type="number" value={swipeFrom.y} onChange={(event) => props.onDraftChange({ swipeFrom: { ...swipeFrom, y: Number(event.target.value) } })} /></label>
-          <label className="setting-field">终点 X<input type="number" value={swipeTo.x} onChange={(event) => props.onDraftChange({ swipeTo: { ...swipeTo, x: Number(event.target.value) } })} /></label>
-          <label className="setting-field">终点 Y<input type="number" value={swipeTo.y} onChange={(event) => props.onDraftChange({ swipeTo: { ...swipeTo, y: Number(event.target.value) } })} /></label>
-          <label className="setting-field span-two">时长（毫秒）<input type="number" value={swipeDurationMs} onChange={(event) => props.onDraftChange({ swipeDurationMs: Number(event.target.value) })} /></label>
-        </div>}
+        {action === 'swipe' && <SwipeEditor hasRandomDelay={draft.hasRandomDelay} onRandomDelayChange={(hasRandomDelay) => props.onDraftChange({ hasRandomDelay })} value={draft.swipe} onChange={(swipe) => props.onDraftChange({ swipe })} pickedSelector={selector} />}
       </div>
       <div className="setting-submit">
         <div className="setting-actions">
