@@ -10,6 +10,8 @@ import { SwipeEditor } from './swipe-editor'
 import { ActionTimingField } from './action-timing-field'
 import { ConditionEditor } from './condition-editor'
 import { ListClickEditor } from './list-click-editor'
+import robotCorner from '../assets/robot-corner.png'
+import { UiIcon } from './ui-icon'
 import { AppPackageSelect } from './app-package-select'
 import type { StepSubmissionState } from '../hooks/use-step-submission'
 import type { ConditionDraft } from '../hooks/use-condition-draft'
@@ -69,29 +71,28 @@ export function StepSettings(props: StepSettingsProps) {
 
   return <section className="panel settings-panel" inert={isRunning}>
     <div className="settings-head">
-      <span className="settings-head-icon">⚙</span>
-      <div><h2>{editingId ? '编辑步骤' : '步骤设置'}</h2><p>配置动作参数和控件定位</p></div>
+      <UiIcon name="settings" />
+      <h2>{editingId ? '编辑步骤' : '步骤设置'}</h2>
+      <img className="settings-mascot" src={robotCorner} alt="" aria-hidden="true" />
     </div>
     <div className="settings-scroll">
       <div className="setting-group" inert={isSubmitting}>
-        <h3>任务信息</h3>
         <label className="setting-field">任务名称<input value={task.name} onChange={(event) => props.onTaskChange({ ...task, name: event.target.value })} /></label>
         <AppPackageSelect value={task.packageName ?? ''} onChange={(packageName) => props.onTaskChange({ ...task, packageName })} />
       </div>
       <div className="setting-group" inert={isSubmitting}>
-        <h3>动作类型</h3>
-        <label className="setting-field">选择动作<select value={action} onChange={(event) => props.onDraftChange({ action: event.target.value as EditorAction })}>
+        <label className="setting-field">动作类型<select id="step-action" value={action} onChange={(event) => props.onDraftChange({ action: event.target.value as EditorAction })}>
           {/* 动作名称与任务流程卡、运行记录保持一致 */}
           {stepTypeOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
         </select></label>
-        {needsTarget && <div className="target-card">
-          <span className="target-icon">⌖</span>
+        {needsTarget && <div className="target-field"><span className="target-label">目标元素</span><div className="target-card">
+          <span className="target-icon"><UiIcon name="scan" size={19} /></span>
           <div>
             <strong>{selector?.value ?? (selectedPoint ? `坐标 (${selectedPoint.x}, ${selectedPoint.y})` : '尚未选择目标')}</strong>
             <small>{selector ? `定位方式：${selector.kind}` : '在左侧切换至拾取元素，或从下方控件树中选择'}</small>
           </div>
-          <button onClick={showTarget}>选择</button>
-        </div>}
+          <button onClick={showTarget} aria-label="选择目标元素" title="选择目标元素"><UiIcon name="scan" size={20} /></button>
+        </div></div>}
         {(action === 'tap' || action === 'input' || action === 'wait') && <ActionTimingField label="超时（毫秒）" value={timeoutMs} max={60000} onChange={(timeoutMs) => props.onDraftChange({ timeoutMs })}
           hasRandomDelay={draft.hasRandomDelay} onRandomDelayChange={action === 'wait' ? undefined : (hasRandomDelay) => props.onDraftChange({ hasRandomDelay })} />}
         {action === 'input' && <label className="setting-field">输入内容<textarea rows={3} value={text} onChange={(event) => props.onDraftChange({ text: event.target.value })} /></label>}
@@ -106,28 +107,28 @@ export function StepSettings(props: StepSettingsProps) {
         {action === 'key' && <label className="setting-field">按键<select value={keyValue} onChange={(event) => props.onDraftChange({ key: event.target.value as 'back' | 'home' })}><option value="back">返回</option><option value="home">Home</option></select></label>}
         {action === 'swipe' && <SwipeEditor hasRandomDelay={draft.hasRandomDelay} onRandomDelayChange={(hasRandomDelay) => props.onDraftChange({ hasRandomDelay })} value={draft.swipe} onChange={(swipe) => props.onDraftChange({ swipe })} pickedSelector={selector} />}
       </div>
-      <div className="setting-submit">
-        <div className="setting-actions">
-          <button className="primary" onClick={props.onAddStep} disabled={Boolean(disabledReason) || isSubmitting} aria-busy={isSubmitting}>
-            {isSubmitting && <span className="button-spinner" aria-hidden="true" />}
-            {isSubmitting ? editingId ? '正在保存…' : '正在添加…' : editingId ? '保存修改' : '添加到流程'}
-          </button>
-          {editingId && <button onClick={props.onCancelEdit} disabled={isSubmitting}>取消修改</button>}
-        </div>
-        {disabledReason && !isSubmitting && <p className="submission-hint" role="status">{disabledReason}</p>}
-        {submission.phase !== 'idle' && <div className={`submission-result ${submission.phase}`} role={submission.phase === 'error' ? 'alert' : 'status'}>
-          {submission.message}
-          {submission.phase === 'error' && submission.canRefineSelector && <button className="submission-link" onClick={showTarget}>修改定位条件</button>}
-        </div>}
-      </div>
       <div className="element-section" ref={elementRef} inert={isSubmitting}>
-        <button className="element-toggle" onClick={() => setTargetOpen(!isTargetOpen)} aria-expanded={isTargetOpen}><span>⌖　元素定位与控件树</span><span>{isTargetOpen ? '⌃' : '⌄'}</span></button>
+        <button className="element-toggle" onClick={() => setTargetOpen(!isTargetOpen)} aria-expanded={isTargetOpen}><span><UiIcon name="scan" size={16} />　元素定位与控件树</span><UiIcon name="down" size={15} style={{ transform: isTargetOpen ? 'rotate(180deg)' : undefined }} /></button>
         {isTargetOpen && <div className="element-content">
           <ElementDetails serial={props.serial} node={selectedNode} nodes={snapshot?.nodes ?? NO_NODES} selector={selector} selectedPoint={selectedPoint} isConnected={isConnected} onSelectorChange={props.onSelectorChange} />
           <HierarchyTree nodes={snapshot?.nodes ?? NO_NODES} selectedId={selectedNode?.id ?? null} hoverNode={hoverNode} onSelect={props.onSelectNode} onHoverNode={props.onHoverNode} />
         </div>}
       </div>
       <p className="settings-tip">拾取前请先连接设备并刷新控件层级；运行时会校验任务内容。</p>
+    </div>
+    <div className="setting-submit">
+      <div className="setting-actions">
+        <button className="primary" onClick={props.onAddStep} disabled={Boolean(disabledReason) || isSubmitting} aria-busy={isSubmitting}>
+          {isSubmitting && <span className="button-spinner" aria-hidden="true" />}
+          {isSubmitting ? editingId ? '正在保存…' : '正在添加…' : editingId ? '保存修改' : '添加到流程'}
+        </button>
+        {editingId && <button onClick={props.onCancelEdit} disabled={isSubmitting}>取消修改</button>}
+      </div>
+      {disabledReason && !isSubmitting && <p className="submission-hint" role="status">{disabledReason}</p>}
+      {submission.phase !== 'idle' && <div className={`submission-result ${submission.phase}`} role={submission.phase === 'error' ? 'alert' : 'status'}>
+        {submission.message}
+        {submission.phase === 'error' && submission.canRefineSelector && <button className="submission-link" onClick={showTarget}>修改定位条件</button>}
+      </div>}
     </div>
   </section>
 }

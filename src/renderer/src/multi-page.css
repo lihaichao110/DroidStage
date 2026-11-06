@@ -1,42 +1,8 @@
 /**
- * 多设备工作台基础样式：三页导航、设备管理与任务编辑；运行监看样式见 monitor.css。
+ * 设备管理页面与运行确认弹窗的布局样式。
  */
-.topbar{gap:26px;z-index:3}.page-tabs{display:flex;align-self:stretch;gap:4px;min-width:0}.page-tabs button{position:relative;border:0;border-radius:0;background:transparent;color:#627594;padding:0 16px;white-space:nowrap;font-size:14px}.page-tabs button.active{color:#0875f8;font-weight:800}.page-tabs button.active:after{content:"";position:absolute;left:14px;right:14px;bottom:0;height:3px;border-radius:3px 3px 0 0;background:#0875f8}.page-tabs button:hover:not(:disabled){background:#f4f8ff}.nav-live{display:inline-block;width:6px;height:6px;border-radius:50%;background:#f2a124;margin-left:6px;vertical-align:middle}.top-summary{margin-left:auto;display:flex;gap:13px;white-space:nowrap;color:#637897;font-size:12px}.top-summary .running{color:#bc7915;font-weight:700}
-.app-status{display:flex;align-items:center;gap:8px;min-height:30px;padding:4px 22px;background:#fff;border-top:1px solid #e4ecf8;color:#627797;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.app-status a{color:#0875f8}.editor-page{display:flex;flex:1;min-height:0;flex-direction:column}.page-hidden{display:none}.editor-toolbar{min-height:67px;display:flex;align-items:center;gap:18px;padding:8px 22px;background:#fff;border-bottom:1px solid #e8eef8}.editor-title{min-width:130px}.editor-title h2{font-size:19px;margin:0;color:#0b1940}.editor-title span{font-size:11px;color:#8797ad}.editor-device{display:flex;align-items:center;gap:8px;white-space:nowrap;color:#627594;font-size:12px}.editor-device select{max-width:205px;padding:7px 8px;border:1px solid #d9e5f5;border-radius:8px;background:#fff;color:#173258;font-size:12px}.target-summary{white-space:nowrap;font-size:12px;color:#0875f8;background:#f3f8ff}.editor-actions{margin-left:auto;display:flex;gap:7px;white-space:nowrap}.editor-actions button{font-size:12px}.editor-page .workspace{padding-top:12px}.settings-panel[inert],.workflow-panel[inert]{opacity:.7}.modal-backdrop{position:fixed;inset:0;z-index:20;background:#0921437a;display:grid;place-items:center}.run-review{width:min(440px,calc(100vw - 30px));max-height:80vh;overflow:auto;background:#fff;border-radius:15px;padding:22px;box-shadow:0 20px 60px #0d295458}.run-review h3{margin:0 0 8px}.run-review p{margin:0 0 12px;color:#6980a0;font-size:13px}.run-review ul{max-height:260px;overflow:auto;margin:0 0 18px;padding:0;list-style:none}.run-review li{display:flex;justify-content:space-between;gap:10px;padding:9px;border-bottom:1px solid #edf2f8;font-size:13px}.run-review li small{color:#7d90ad}.review-actions{display:flex;justify-content:flex-end;gap:8px}
-
-/* 提交反馈留在按钮旁，避免底部状态栏在长时间设备查询后被其他消息覆盖。 */
-.setting-submit{padding:14px 0;border-bottom:1px solid #eaf0f8}
-.setting-submit .setting-actions button{display:inline-flex;align-items:center;justify-content:center;gap:7px}
-.setting-submit .setting-actions .primary[aria-busy="true"]{opacity:1;cursor:progress}
-.submission-hint{margin:9px 0 0;color:#8a611b;font-size:12px;line-height:1.5}
-.submission-result{margin-top:10px;padding:10px 12px;border:1px solid #dce8f8;border-radius:9px;font-size:12px;line-height:1.55;overflow-wrap:anywhere}
-.submission-result.pending{color:#365d91;background:#f3f8ff}
-.submission-result.success{color:#18623d;background:#f0faf4;border-color:#bde8ce}
-.submission-result.error{color:#a53a35;background:#fff4f2;border-color:#f2c5be}
-.submission-link{display:block;margin-top:7px;padding:3px 0;border:0;background:transparent;color:#0875f8;font-size:12px;text-decoration:underline;box-shadow:none}
-.submission-link:hover:not(:disabled){background:transparent;border-color:transparent;color:#005fcf}
-.setting-group[inert],.element-section[inert],.device-panel[inert]{opacity:.7}
-.button-spinner{width:13px;height:13px;flex:none;border:2px solid #ffffff70;border-top-color:#fff;border-radius:50%;animation:submission-spin .75s linear infinite}
-@keyframes submission-spin{to{transform:rotate(360deg)}}
-@media (prefers-reduced-motion:reduce){.button-spinner{animation:none;border-color:#fff}}
+.page-hidden{display:none}
+.modal-backdrop{position:fixed;inset:0;z-index:20;background:#0921437a;display:grid;place-items:center}.run-review{width:min(440px,calc(100vw - 30px));max-height:80vh;overflow:auto;background:#fff;border-radius:15px;padding:22px;box-shadow:0 20px 60px #0d295458}.run-review h3{margin:0 0 8px}.run-review p{margin:0 0 12px;color:#6980a0;font-size:13px}.run-review ul{max-height:260px;overflow:auto;margin:0 0 18px;padding:0;list-style:none}.run-review li{display:flex;justify-content:space-between;gap:10px;padding:9px;border-bottom:1px solid #edf2f8;font-size:13px}.run-review li small{color:#7d90ad}.review-actions{display:flex;justify-content:flex-end;gap:8px}
 .page-content{flex:1;min-height:0;overflow:auto;padding:22px;background:#f5f8fd}.page-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:16px}.page-heading h2{font-size:23px;margin:0 0 4px;color:#0b1940}.page-heading p{font-size:13px;color:#788baa;margin:0}.page-card{background:#fff;border:1px solid #e0eafa;border-radius:12px;box-shadow:0 7px 24px #3e6ca10b;min-width:0}.device-layout{display:grid;grid-template-columns:minmax(0,1fr) 310px;gap:16px;align-items:start}.device-list-card{overflow:hidden}.list-toolbar{display:flex;align-items:center;gap:8px;padding:14px;border-bottom:1px solid #edf2f9}.list-toolbar input{flex:1;min-width:100px}.list-toolbar input,.list-toolbar select,.wireless-card input{padding:8px 10px;border:1px solid #d8e5f5;border-radius:8px}.list-toolbar span{margin-left:auto;color:#617796;white-space:nowrap;font-size:12px}.list-toolbar button{white-space:nowrap;font-size:12px}.device-table-wrap{overflow:auto}.device-table{width:100%;min-width:800px;border-collapse:collapse}.device-table th{text-align:left;background:#f8fbff;color:#788aa6;font-size:11px;font-weight:700;padding:11px 12px;white-space:nowrap}.device-table td{border-top:1px solid #edf2f8;padding:12px;font-size:12px;color:#2d4264;vertical-align:middle}.device-table td:first-child,.device-table th:first-child{text-align:center}.device-table td strong,.device-table td small{display:block}.device-table td small{font-size:10px;color:#8192ad;margin-top:3px;max-width:200px;overflow-wrap:anywhere}.device-table td small.inline-error{color:#bc3e3e}.device-table input[type=checkbox]{accent-color:#0875f8;width:16px;height:16px}.table-empty{text-align:center!important;padding:32px!important;color:#8698b1!important}.state-pill{display:inline-flex;align-items:center;border-radius:999px;padding:4px 8px;background:#eef2f8;color:#687b98;white-space:nowrap;font-size:11px;font-weight:700}.state-pill.ok{background:#e8f8ee;color:#138b4d}.state-pill.warn{background:#fff3df;color:#a86e12}.row-actions{display:flex;gap:5px;flex-wrap:wrap}.row-actions button{padding:5px 7px;font-size:11px;white-space:nowrap}.wireless-card{padding:18px}.wireless-card h3{margin:0 0 8px;font-size:17px}.wireless-card p{margin:0 0 14px;color:#7588a5;font-size:12px;line-height:1.6}.wireless-section{border-top:1px solid #edf2f8;padding-top:14px;margin-top:14px}.wireless-section h4{font-size:13px;margin:0 0 12px}.wireless-section label{display:block;font-size:12px;font-weight:700;color:#334b71;margin:0 0 10px}.wireless-section input{display:block;width:100%;margin-top:5px;font-weight:400}.wireless-section button{width:100%;font-size:12px}.inline-error{color:#bc3e3e!important;line-height:1.4}
 .run-running{color:#ad7215}.run-success{color:#128b4a}.run-failure{color:#bd3e3e}.run-cancelled{color:#7d8797}
-@media(max-width:1250px){.topbar{gap:10px}.page-tabs button{padding:0 10px}.top-summary{gap:7px}.editor-toolbar{gap:8px;padding:8px 12px}.editor-device select{max-width:150px}.device-layout{grid-template-columns:minmax(0,1fr) 280px}}
-  .wireless-section select{display:block;width:100%;margin-top:5px;padding:8px 10px;border:1px solid #d8e5f5;border-radius:8px;background:#fff;color:#334b71;font-weight:400}
-.match-options { display: grid; gap: 5px; margin-top: 8px; }
-.match-choice { display: flex; align-items: center; gap: 6px; padding: 4px 6px; border-radius: 5px; font-size: 12px; color: #577092; }
-.match-choice.selected { background: #e1efff; color: #153f79; }
-.list-click-editor { display: grid; gap: 9px; }
-.list-click-editor p { margin: 3px 0; font-size: 12px; color: #60738d; }
-.list-field { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
-.list-field strong { grid-column: 1 / -1; font-size: 12px; }
-.list-field input { min-width: 0; }
-.list-field button { grid-column: 1 / -1; }
-/* 预览失败时给定位值为空的字段行加红色描边，直接指出缺哪一项 */
-.list-field-missing { padding: 5px; border: 1px solid #d9827c; border-radius: 6px; }
-.list-field-missing input { border-color: #b73e36; }
-.list-preview{display:grid;gap:5px;padding:9px;border:1px solid #dce8f8;border-radius:8px;background:#f8fbff;font-size:12px}
-.list-preview-row{display:grid;grid-template-columns:60px 72px 1fr;gap:7px;padding:5px 0;border-top:1px solid #e8eef8;align-items:start}
-.list-preview-row small{overflow-wrap:anywhere;color:#7388a5}
-.list-preview-error,.list-preview-row small.list-preview-error{color:#b73e36!important}
-.run-partial, .run-warning { color: #b56812; }
+@media(max-width:1250px){.device-layout{grid-template-columns:minmax(0,1fr) 280px}}

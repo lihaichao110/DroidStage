@@ -8,14 +8,11 @@ import { DeviceManagerPage } from './components/device-manager-page'
 import { RunMonitorPage } from './components/run-monitor-page'
 import { TaskEditorPage } from './components/task-editor-page'
 import { useDeviceFleet } from './hooks/use-device-fleet'
-import droidstageIcon from './assets/droidstage-icon.png'
+import { AppHeader, AppStatus, type Page } from './components/app-chrome'
 
-type Page = 'editor' | 'devices' | 'monitor'
-const PAGES: { id: Page; label: string }[] = [
-  { id: 'editor', label: '任务编辑' }, { id: 'devices', label: '设备管理' },
-  { id: 'monitor', label: '运行工作台' }
-]
-
+/** 组合三个工作页面并维持跨页设备会话与运行状态。
+ * @returns 桌面应用外壳及当前工作页面
+ */
 export default function App() {
   const [page, setPage] = useState<Page>('editor')
   const [message, setMessage] = useState('请在设备管理页连接设备。')
@@ -80,13 +77,7 @@ export default function App() {
   }
 
   return <div className="app">
-    <header className="topbar">
-      <div className="brand"><img src={droidstageIcon} alt="" /><h1>卓序</h1></div>
-      <nav className="page-tabs" aria-label="主页面">
-        {PAGES.map((item) => <button key={item.id} className={page === item.id ? 'active' : ''} aria-current={page === item.id ? 'page' : undefined} onClick={() => switchPage(item.id)}>{item.label}{item.id === 'monitor' && running && <span className="nav-live" />}</button>)}
-      </nav>
-      <div className="top-summary"><span>{fleet.connectedSerials.length} 台已连接</span><span className={running ? 'running' : ''}>{running ? '任务运行中' : '空闲'}</span></div>
-    </header>
+    <AppHeader page={page} count={fleet.connectedSerials.length} isRunning={running} onSwitch={switchPage} />
 
     <TaskEditorPage
       active={page === 'editor'} devices={fleet.devices} connectedSerials={fleet.connectedSerials}
@@ -99,7 +90,7 @@ export default function App() {
       onRunLaunched={launchRun} onRunLaunchFailed={failRun} onPendingCancel={cancelPendingRun}
       onCancel={(serial) => void cancel(serial)} onOpenResult={(directory) => void window.androidAutoDesk.openRunDir(directory).catch((error) => setMessage(errorText(error)))} onError={setMessage} />}
 
-    <div className="app-status" role="status"><span className="status-dot" />{message}{message.includes('驱动') && <a href="https://developer.android.com/studio/run/oem-usb" target="_blank" rel="noreferrer">厂商驱动说明</a>}</div>
+    <AppStatus count={fleet.connectedSerials.length} message={message} />
   </div>
 }
 

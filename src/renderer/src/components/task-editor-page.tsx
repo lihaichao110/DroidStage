@@ -30,6 +30,11 @@ type TaskEditorPageProps = {
   onRunPrepared: (task: AutomationTask, targets: string[]) => void
 }
 
+/**
+ * 保持真实任务与拾取状态，组合工具栏和三栏编辑面板。
+ * @param props 页面可见性、设备会话和运行准备回调
+ * @returns 任务编辑页面及运行确认弹窗
+ */
 export function TaskEditorPage({ active, devices, connectedSerials, focused, targets, running, setFocused, setMessage, onShowDevices, onRunPrepared }: TaskEditorPageProps) {
   const connected = connectedSerials.includes(focused)
   // 页面级状态：拾取结果与任务本体，草稿之外的一切
@@ -125,12 +130,14 @@ export function TaskEditorPage({ active, devices, connectedSerials, focused, tar
     setTask({ ...task, steps })
   }
 
+  /** 将焦点交给动作字段，空状态按钮不会直接生成未配置步骤。 */
   function startNewStep(): void {
     clearFeedback()
     updateDraft({ editingId: null })
     conditionDraft.reset()
     listDraft.reset()
     setMessage('在右侧配置新步骤。')
+    requestAnimationFrame(() => document.getElementById('step-action')?.focus())
   }
 
   const { save, load, run, saveAndRun } = useTaskActions({
@@ -142,15 +149,19 @@ export function TaskEditorPage({ active, devices, connectedSerials, focused, tar
 
   return <div className={`editor-page${active ? '' : ' page-hidden'}`}>
     <EditorToolbar
-      task={task} focused={focused} devices={devices} connectedSerials={connectedSerials}
-      targets={targets} busy={busy} running={running} isSubmitting={isSubmitting} canRun={canRun}
-      onFocusedChange={setFocused} onShowDevices={onShowDevices}
+      task={task}
+      targets={targets} running={running} isSubmitting={isSubmitting} canRun={canRun}
+      onShowDevices={onShowDevices}
       onLoad={() => void load()} onSave={() => void save()}
       onRun={() => setRunReview('run')} onSaveAndRun={() => setRunReview('save-run')}
     />
     {active && <main className="workspace">
       <InspectorPanel
         serial={focused}
+        devices={devices}
+        connectedSerials={connectedSerials}
+        onFocusedChange={setFocused}
+        onShowDevices={onShowDevices}
         snapshot={snapshot}
         selectedNode={selectedNode}
         hoverNode={hoverNode}

@@ -1,0 +1,50 @@
+/**
+ * 任务流程样式：空态以插画引导，真实步骤以可编辑的纵向卡片呈现。
+ */
+@scope (.editor-page) {
+  .outline-blue { border-color: #d0dfef; background: #f5f9fe; color: #4e7ea9; font-size: 12px; white-space: nowrap; }
+  .workflow-scroll { overflow: auto; min-height: 0; flex: 1; display: flex; flex-direction: column; overscroll-behavior: contain; }
+  .flow-list { padding: 18px 16px 12px; }
+  /* 包名卡片先占用自身高度，空态只使用剩余空间；真实步骤仍沿用原列表布局。 */
+  .flow-list.is-empty { display: flex; flex-direction: column; flex: 1; min-height: 0; padding: 12px; }
+  .flow-list.is-empty > .flow-row { flex: none; }
+  .flow-row { position: relative; display: grid; grid-template-columns: 40px minmax(0, 1fr); margin-bottom: 14px; }
+  /* 连线只连接相邻步骤，避免空态或底部留白出现多余的竖线。 */
+  .flow-row:has(+ .flow-row)::after { content: ''; position: absolute; left: 14px; top: 30px; bottom: -14px; width: 1px; background: #cfdfef; }
+  .flow-number { z-index: 1; display: grid; place-items: center; width: 30px; height: 30px; border: 3px solid #fff; border-radius: 50%; color: #fff; background: #6c96bd; box-shadow: 0 0 0 1px #d6e3f0; font-size: 12px; font-weight: 700; }
+  .flow-number.selected { background: #427cae; }
+  .flow-card { min-width: 0; min-height: 98px; display: flex; align-items: flex-start; gap: 10px; border: 1px solid #d5e1ed; border-radius: 12px; padding: 14px 12px; background: linear-gradient(135deg, #fff, #fafdff); transition: border-color 180ms, box-shadow 180ms; }
+  .flow-card:hover { border-color: #acc7df; }
+  .flow-card.selected { border-color: #70a1ca; background: #f0f7fd; box-shadow: 0 0 0 2px #729fc31a; }
+  .flow-icon { flex: none; display: grid; place-items: center; width: 34px; height: 36px; border: 1px solid #d4e4f4; border-radius: 9px; background: linear-gradient(#eff6fe, #e2eefb); color: #5b87af; }
+  .flow-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+  .flow-copy strong { font-size: 14px; font-weight: 650; }
+  .flow-copy small { font-size: 11px; color: #7d8c9e; line-height: 1.6; }
+  .flow-detail { display: flex; align-items: center; gap: 8px; min-width: 0; margin-top: 3px; padding: 7px 9px; border: 1px solid #e3ebf4; border-radius: 6px; background: #f5f8fc; font-size: 11px; color: #8b9aab; }
+  .flow-detail span { flex: none; border-right: 1px solid #d6e0ea; padding-right: 8px; }
+  .flow-detail b { min-width: 0; font-weight: 400; color: #546b82; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .flow-actions { position: relative; flex: none; }
+  .flow-actions > button { padding: 0; border: 0; background: transparent; color: #7d8ea0; }
+  .flow-menu { display: none; position: absolute; right: 0; top: 20px; z-index: 2; gap: 2px; padding: 4px; border: 1px solid #d5e1ed; border-radius: 8px; background: #fff; box-shadow: 0 5px 16px #2a496a22; }
+  .flow-actions:hover .flow-menu, .flow-actions:focus-within .flow-menu { display: flex; }
+  .flow-menu button { padding: 3px 7px; border: 0; }
+  .flow-branches { display: flex; flex-direction: column; gap: 5px; padding: 7px 9px; border-radius: 6px; background: #f4f8fc; font-size: 11px; line-height: 1.6; color: #67829b; overflow-wrap: anywhere; }
+  .flow-empty { display: flex; flex: 1; min-height: 0; flex-direction: column; align-items: center; justify-content: safe center; gap: 10px; padding: 12px 0; text-align: center; animation: flow-appear 200ms ease-out; }
+  /* 优先压缩装饰区，保留文字和按钮高度；极小空间仍由外层正常滚动。 */
+  .workflow-art-space { display: grid; place-items: center; flex: 0 1 179px; min-height: 64px; width: 100%; container-type: size; }
+  /* 高度换算沿用原图比例，图片和数字共用同一个缩放坐标系。 */
+  .workflow-art { position: relative; width: min(100%, 280px, calc(100cqh * 1568 / 1003)); container-type: inline-size; }
+  .workflow-art img { display: block; width: 100%; height: auto; }
+  .workflow-art-numbers { position: absolute; inset: 58% 0 auto; display: grid; grid-template-columns: repeat(3, 1fr); justify-items: start; padding: 0 7%; gap: 7%; }
+  .workflow-art-numbers span { display: grid; place-items: center; width: 6cqw; height: 6cqw; border: 1px solid #ffffffb0; border-radius: 50%; color: #fff; background: #5b8fba; font-size: 3.6cqw; box-shadow: 0 1px 3px #4875a026; }
+  .flow-empty > strong { flex: none; font-size: 20px; font-weight: 650; color: #3c4655; }
+  .flow-empty p { flex: none; max-width: 360px; margin: 0; color: #7b8491; font-size: 12px; line-height: 1.6; }
+  .flow-empty > button { flex: none; min-height: 36px; padding: 6px 20px; font-size: 13px; }
+}
+@keyframes flow-appear { from { opacity: 0; } to { opacity: 1; } }
+@media (max-width: 1250px), (max-height: 760px) {
+  @scope (.editor-page) {
+    .flow-list { padding: 14px 12px; }
+    .flow-row { grid-template-columns: 35px minmax(0, 1fr); }
+  }
+}

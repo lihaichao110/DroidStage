@@ -1,0 +1,65 @@
+/**
+ * 编辑页布局与设备面板：三栏独立滚动，空设备引导不占用真实投屏状态。
+ */
+.editor-page { display: flex; flex: 1; min-height: 0; flex-direction: column; background: linear-gradient(135deg, #edf3f9, #e9f1fa 60%, #f0f5fa); }
+.editor-page.page-hidden { display: none; }
+@scope (.editor-page) {
+  * { scrollbar-width: thin; scrollbar-color: #c5d3e2 transparent; }
+  button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+  .primary { background: linear-gradient(#6593bd, #4075a6); border-color: #447ba9; color: #fff; box-shadow: inset 0 1px 1px #ffffff30, 0 2px 3px #436d9512; }
+  .primary:hover:not(:disabled) { background: linear-gradient(#5689b8, #346a9c); border-color: #346a9c; box-shadow: 0 3px 10px #426e9b2b; }
+  .primary:disabled { color: #7c8794; background: #e0e5eb; border-color: #e0e5eb; box-shadow: none; }
+  .editor-toolbar { position: relative; z-index: 3; min-height: 66px; display: flex; align-items: center; flex-wrap: wrap; gap: 16px; padding: 10px 18px; border-bottom: 1px solid #d5e0ec; background: #ffffffba; }
+  .editor-title { display: flex; align-items: center; gap: 10px; min-width: 0; max-width: 300px; border: 1px solid #d2ddea; border-radius: 9px; height: 42px; padding: 0 14px; background: #ffffff80; }
+  .editor-title h2 { margin: 0; font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .editor-title span { font-size: 14px; white-space: nowrap; }
+  .editor-actions { display: flex; align-items: center; gap: 12px; }
+  .editor-actions > button { height: 40px; padding: 0 16px; font-size: 14px; white-space: nowrap; }
+  .toolbar-divider { height: 28px; border-left: 1px solid #d4deea; margin: 0 3px; }
+  .target-summary { margin-left: auto; white-space: nowrap; border: 0; background: transparent; color: #657b92; font-size: 12px; }
+  .task-more { position: relative; }
+  .task-more summary { display: grid; place-items: center; width: 36px; height: 38px; border-radius: 8px; cursor: pointer; list-style: none; color: #687c91; }
+  .task-more summary::-webkit-details-marker { display: none; }
+  .task-more summary:hover, .task-more[open] summary { background: #e8f0f8; }
+  .task-more-menu { position: absolute; right: 0; top: calc(100% + 7px); min-width: 200px; padding: 6px; border: 1px solid #cedcea; border-radius: 10px; background: #fff; box-shadow: 0 8px 25px #29496922; }
+  .task-more-menu button { width: 100%; justify-content: flex-start; border: 0; font-size: 13px; padding: 10px; }
+  .workspace { display: grid; grid-template-columns: minmax(220px, 24%) minmax(360px, 1fr) minmax(300px, 28%); gap: 12px; padding: 22px 14px 14px; flex: 1; min-height: 0; }
+  .panel { display: flex; flex-direction: column; min-width: 0; min-height: 0; border: 1px solid #cddbea; border-radius: 14px; background: linear-gradient(130deg, #fff, #fcfdff); box-shadow: 0 4px 18px #49678407; overflow: hidden; }
+  .panel-head, .settings-head { display: flex; align-items: center; justify-content: space-between; flex: none; gap: 10px; min-height: 58px; padding: 12px 20px; border-bottom: 1px solid #d8e2ee; background: linear-gradient(110deg, #ffffff70, #f4f8fd90); }
+  .panel-head h2, .settings-head h2 { display: flex; align-items: center; gap: 12px; margin: 0; font-size: 18px; font-weight: 650; color: #27313e; }
+  .icon-action { border: 0; background: transparent; padding: 5px; color: #7b8da2; }
+  .preview-device-select { display: flex; align-items: center; gap: 8px; padding: 10px 14px; font-size: 11px; color: #7b8b9e; border-bottom: 1px solid #e1e8f1; }
+  .preview-device-select span { flex: none; }
+  .preview-device-select select { min-width: 0; width: 100%; border: 1px solid #d3deea; border-radius: 6px; padding: 6px; background: #fff; color: #344a60; font-size: 12px; }
+  .image-stage { flex: 1; min-height: 0; position: relative; display: flex; align-items: center; justify-content: center; overflow: hidden; padding: 20px; }
+  .image-stage canvas { max-width: 100%; max-height: 100%; height: auto; width: auto; object-fit: contain; border-radius: 22px; box-shadow: 0 0 0 6px #242b36, 0 0 0 8px #667180, 0 10px 25px #12213b26; touch-action: none; }
+  .image-stage canvas.inspect { cursor: crosshair; }
+  .device-empty-state { display: flex; flex: 1; min-height: 0; align-items: center; justify-content: center; flex-direction: column; gap: 32px; padding: 28px 20px; }
+  .phone-placeholder { position: relative; width: min(60%, 180px); height: min(65%, 310px); min-height: 180px; flex-shrink: 1; border: 8px solid #d2dae5; border-radius: 32px; box-shadow: inset 0 0 25px #c2d0e414; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 20px; background: linear-gradient(145deg, #fafbfd, #f0f4f9); color: #7c8798; }
+  .phone-placeholder > span:last-child { font-size: 15px; font-weight: 600; color: #6b7483; white-space: nowrap; }
+  .phone-camera { position: absolute; top: 7px; left: calc(50% - 5px); width: 10px; height: 10px; border: 1px solid #c0cbda; border-radius: 50%; background: #cbd5e2; }
+  .connect-device { flex: none; width: min(100%, 210px); min-height: 44px; font-size: 16px; }
+  .device-foot { flex: none; padding: 12px 16px; }
+  .mode-switch { display: flex; gap: 10px; padding-top: 12px; border-top: 1px solid #dce5ef; }
+  .mode-switch button { flex: 1; min-width: 0; gap: 7px; border: 0; border-radius: 8px; background: #f0f3f7; color: #718093; font-size: 13px; padding: 10px 4px; }
+  .mode-switch button.active:not(:disabled) { background: #e4effb; color: #3975ab; box-shadow: inset 0 0 0 1px #c5daee; }
+  .mode-switch button:disabled { background: #e6eaf0; }
+}
+@media (max-width: 1250px) {
+  @scope (.editor-page) {
+    .workspace { padding: 16px 10px 10px; gap: 10px; grid-template-columns: minmax(220px, 23%) minmax(360px, 1fr) minmax(300px, 29%); }
+    .editor-toolbar { gap: 10px; padding: 9px 12px; }
+    .editor-title { max-width: 220px; }
+    .editor-actions { gap: 7px; }
+    .editor-actions > button { padding: 0 12px; font-size: 13px; }
+    .target-summary { padding: 6px; font-size: 11px; }
+    .panel-head, .settings-head { padding: 12px 16px; }
+    .mode-switch { gap: 6px; }
+  }
+}
+@media (max-height: 760px) {
+  @scope (.editor-page) {
+    .device-empty-state { gap: 22px; padding: 20px; }
+    .phone-placeholder { min-height: 150px; border-width: 7px; border-radius: 26px; }
+  }
+}

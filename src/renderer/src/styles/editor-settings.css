@@ -1,0 +1,50 @@
+/**
+ * 步骤设置样式：主字段清晰排列，详细定位可展开，提交区独立于内容滚动。
+ */
+@scope (.editor-page) {
+  .settings-panel { position: relative; overflow: visible; }
+  .settings-head { justify-content: flex-start; gap: 12px; border-radius: 14px 14px 0 0; }
+  .settings-mascot { position: absolute; z-index: 2; width: 144px; height: 124px; object-fit: contain; top: -58px; right: 12px; pointer-events: none; user-select: none; }
+  .settings-scroll { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 20px 20px 16px; }
+  .setting-group { padding: 0; }
+  .setting-field { display: block; margin: 0 0 20px; color: #303a48; font-size: 14px; font-weight: 500; }
+  .setting-field input, .setting-field select, .setting-field textarea { display: block; width: 100%; min-width: 0; margin-top: 8px; padding: 10px 12px; min-height: 40px; border: 1px solid #cbd5e2; border-radius: 8px; background: #fefeff; color: #303947; font-weight: 400; outline: 0; box-shadow: inset 0 1px 2px #3f5c7a03; transition: border-color 180ms, box-shadow 180ms; }
+  .setting-field input:focus, .setting-field select:focus, .setting-field textarea:focus { border-color: #79a0c4; box-shadow: 0 0 0 3px #6293c019; }
+  .setting-field input::placeholder { color: #8d96a4; }
+  .setting-field textarea { resize: vertical; }
+  .optional { font-size: 11px; color: #8b99a9; font-weight: 400; }
+  .target-label { display: block; margin-bottom: 8px; font-size: 14px; color: #303a48; }
+  .target-card { display: flex; align-items: center; gap: 8px; margin-bottom: 20px; padding: 9px 10px 9px 12px; border: 1px solid #cfd9e5; border-radius: 8px; background: linear-gradient(100deg, #fafbfd, #f1f4f8); }
+  .target-icon { display: none; }
+  .target-card > div { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .target-card strong { font-size: 13px; font-weight: 400; color: #718095; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .target-card small { font-size: 10px; color: #8b9aac; line-height: 1.5; }
+  .target-card button { padding: 3px; border: 0; background: transparent; color: #7e8e9f; }
+  .setting-submit { flex: none; max-height: 40%; overflow: auto; padding: 12px 20px 14px; border-top: 1px solid #e0e7ef; border-radius: 0 0 14px 14px; background: #fafcfe; }
+  .setting-actions { display: flex; gap: 8px; }
+  .setting-actions button { min-height: 38px; font-size: 13px; }
+  .setting-actions .primary { flex: 1; }
+  .setting-actions .primary[aria-busy=true] { opacity: 1; cursor: progress; }
+  .submission-hint { margin: 8px 0 0; color: #8f7449; font-size: 11px; line-height: 1.6; }
+  .submission-result { margin-top: 9px; padding: 9px 10px; border: 1px solid #d7e3ef; border-radius: 8px; font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+  .submission-result.pending { color: #4e7193; background: #f1f6fc; }
+  .submission-result.success { color: #347657; background: #f0f8f3; border-color: #c9e4d4; }
+  .submission-result.error { color: #a04f49; background: #fff5f2; border-color: #eed2cb; }
+  .submission-link { display: block; padding: 4px 0; border: 0; background: transparent; color: #477faa; font-size: 12px; text-decoration: underline; }
+  .settings-tip { font-size: 11px; color: #8b99aa; line-height: 1.7; margin: 16px 0 0; }
+  .swipe-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 10px; }
+  .span-two { grid-column: span 2; }
+  .settings-panel[inert], .workflow-panel[inert], .setting-group[inert], .element-section[inert], .device-panel[inert] { opacity: .7; }
+  .button-spinner { width: 13px; height: 13px; flex: none; border: 2px solid #ffffff70; border-top-color: #fff; border-radius: 50%; animation: submission-spin .75s linear infinite; }
+  /* 随机停顿开关不继承整行时间输入的尺寸，避免多层表单样式放大复选框。 */
+  .action-timing-toggle input[type=checkbox] { display: inline-block; width: 14px; height: 14px; min-height: 0; margin: 0; padding: 0; accent-color: #5687b3; }
+}
+@keyframes submission-spin { to { transform: rotate(360deg); } }
+@media (max-width: 1250px) {
+  @scope (.editor-page) {
+    .settings-scroll { padding: 16px 16px 12px; }
+    .setting-field { margin-bottom: 16px; font-size: 13px; }
+    .setting-submit { padding: 10px 16px; }
+    .settings-mascot { width: 120px; height: 104px; top: -48px; right: 8px; }
+  }
+}

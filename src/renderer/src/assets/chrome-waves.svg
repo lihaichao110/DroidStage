@@ -1,0 +1,8 @@
+<!-- 公共导航与状态栏使用的低对比度装饰波纹。 -->
+<svg xmlns="http://www.w3.org/2000/svg" width="560" height="90" viewBox="0 0 560 90" fill="none">
+  <defs><linearGradient id="a" x1="40" y1="90" x2="480" y2="0" gradientUnits="userSpaceOnUse"><stop stop-color="#b9d5f4" stop-opacity=".08"/><stop offset="1" stop-color="#9bc2ed" stop-opacity=".45"/></linearGradient></defs>
+  <path d="M0 90C90-20 140 10 225 45S360 82 415 0H560V90Z" fill="url(#a)"/>
+  <path d="M30 90C125-35 190 72 280 65S420 15 470 0H560V90Z" fill="url(#a)"/>
+  <path d="M0 90C140-15 165 52 300 74S430 27 560 10V90Z" fill="url(#a)"/>
+  <path d="M30 89C125-35 190 72 280 65S420 15 470 0" stroke="white" stroke-opacity=".55"/>
+</svg>

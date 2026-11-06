@@ -2,10 +2,16 @@
  * 设备预览面板：展示实时投屏并提供操控、拾取与层级刷新入口。
  */
 import { useState } from 'react'
-import type { HierarchySnapshot, Point, UiNode } from '../../../shared/types'
+import { DeviceEmptyState } from './device-empty-state'
+import { UiIcon } from './ui-icon'
+import type { Device, HierarchySnapshot, Point, UiNode } from '../../../shared/types'
 import { ScreenMirror, type MirrorMode } from './screen-mirror'
 
 type InspectorPanelProps = {
+  devices: Device[]
+  connectedSerials: string[]
+  onFocusedChange: (serial: string) => void
+  onShowDevices: () => void
   serial: string
   snapshot: HierarchySnapshot | null
   selectedNode: UiNode | null
@@ -24,15 +30,21 @@ type InspectorPanelProps = {
  * @param props 投屏状态及拾取回调
  * @returns 设备预览面板
  */
-export function InspectorPanel({ serial, snapshot, selectedNode, hoverNode, isConnected, isBusy, isTaskRunning, isSubmitting, onRefresh, onSelect, onHoverNode }: InspectorPanelProps) {
+export function InspectorPanel({ devices, connectedSerials, onFocusedChange, onShowDevices, serial, snapshot, selectedNode, hoverNode, isConnected, isBusy, isTaskRunning, isSubmitting, onRefresh, onSelect, onHoverNode }: InspectorPanelProps) {
   const [mode, setMode] = useState<MirrorMode>('control')
 
   return <section className="panel device-panel" inert={isSubmitting}>
     <div className="panel-head device-head">
-      <h2>设备预览</h2>
-      <button className="icon-action" title="刷新控件层级" aria-label="刷新控件层级" onClick={onRefresh} disabled={!isConnected || isBusy || isTaskRunning}>↻</button>
+      <h2><UiIcon name="phone" />设备预览</h2>
+      <button className="icon-action" title="刷新控件层级" aria-label="刷新控件层级" onClick={onRefresh} disabled={!isConnected || isBusy || isTaskRunning}><UiIcon name="refresh" size={19} /></button>
     </div>
-    <ScreenMirror
+    {connectedSerials.length > 0 && <label className="preview-device-select"><span>编辑设备</span>
+      <select value={serial} disabled={isBusy || isTaskRunning} onChange={(event) => onFocusedChange(event.target.value)}>
+        {!connectedSerials.includes(serial) && <option value="">请选择设备</option>}
+        {devices.filter((device) => connectedSerials.includes(device.serial)).map((device) => <option key={device.serial} value={device.serial}>{device.model || device.serial} · {device.serial}</option>)}
+      </select>
+    </label>}
+    {isConnected ? <ScreenMirror
       serial={serial}
       snapshot={snapshot}
       selectedNode={selectedNode}
@@ -44,11 +56,11 @@ export function InspectorPanel({ serial, snapshot, selectedNode, hoverNode, isCo
       onPick={onSelect}
       onHoverNode={onHoverNode}
       onRefresh={onRefresh}
-    />
+    /> : <DeviceEmptyState onConnect={onShowDevices} />}
     <div className="device-foot">
       <div className="mode-switch" role="group" aria-label="鼠标模式">
-        <button className={mode === 'inspect' ? 'active' : ''} onClick={() => setMode('inspect')} disabled={!isConnected}>◎ <span>拾取元素</span></button>
-        <button className={mode === 'control' ? 'active' : ''} onClick={() => setMode('control')} disabled={!isConnected}>↗ <span>操控设备</span></button>
+        <button className={mode === 'inspect' ? 'active' : ''} onClick={() => setMode('inspect')} disabled={!isConnected}><UiIcon name="scan" size={19} /><span>拾取元素</span></button>
+        <button className={mode === 'control' ? 'active' : ''} onClick={() => setMode('control')} disabled={!isConnected}><UiIcon name="pointer" size={19} /><span>操控设备</span></button>
       </div>
     </div>
   </section>
