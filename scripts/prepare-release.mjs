@@ -14,7 +14,8 @@ const target = process.argv[2]
 const output = path.resolve(process.argv[3] ?? path.join(root, 'release'))
 const expected = {
   win: [`${productName}-Setup-${version}-x64.exe`],
-  mac: ['x64', 'arm64'].flatMap((arch) => ['dmg', 'zip'].map((ext) => `${productName}-${version}-${arch}.${ext}`))
+  // mac 发行仅打 Apple Silicon 单架构（见 docs/release-mac.md），恢复 Intel 支持时加回 x64
+  mac: ['dmg', 'zip'].map((ext) => `${productName}-${version}-arm64.${ext}`)
 }
 expected.all = [...expected.win, ...expected.mac]
 
