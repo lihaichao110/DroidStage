@@ -1,0 +1,53 @@
+/**
+ * 连接引导样式：可访问标签、编号步骤、折叠维护区域与独立滚动表单。
+ */
+@scope (.devices-page) {
+  .device-connection-panel { display: flex; flex-direction: column; position: relative; }
+  .connection-head { display: flex; align-items: center; gap: 12px; min-height: 65px; padding: 18px 20px 12px; flex: none; position: relative; }
+  .connection-head h2 { display: flex; align-items: center; gap: 10px; font-size: 20px; margin: 0; color: #20324b; }
+  /* PNG 自带透明留白，按可见双手对齐标签栏上沿，而非按文件顶边定位。 */
+  .connection-head img { position: absolute; width: 114px; height: 90px; object-fit: contain; top: -8px; right: 62px; pointer-events: none; }
+  .connection-collapse { margin-left: auto; padding: 5px 0 5px 8px; background: none; border: 0; color: #71859d; font-size: 12px; }
+  .connection-tabs { display: flex; padding: 3px; margin: 0 15px 12px; border: 1px solid #cfdeee; border-radius: 9px; flex: none; background: #fff; }
+  .connection-tabs button { border: 0; background: none; font-size: 12px; padding: 9px 2px; border-radius: 7px; flex: 1; color: #394a62; }
+  .connection-tabs button[aria-selected=true] { background: linear-gradient(110deg, #dbeaff, #c9dffb); color: #316da5; box-shadow: inset 0 1px 0 #ffffff80; }
+  .connection-scroll { min-height: 0; flex: 1; overflow: auto; padding: 0 18px 18px; overscroll-behavior: contain; }
+  .connection-notice { display: flex; align-items: flex-start; gap: 7px; font-size: 11px; color: #637f9f; background: #edf4fe; border-radius: 8px; padding: 9px 10px; line-height: 1.7; margin-bottom: 18px; }
+  .connection-notice svg, .connection-warning svg { margin-top: 2px; }
+  .connection-step { position: relative; padding-bottom: 21px; }
+  .connection-step + .connection-step { border-top: 1px solid #e0e9f4; padding-top: 18px; }
+  .connection-step h3 { display: flex; align-items: center; gap: 10px; font-size: 15px; color: #263a55; margin: 0 0 11px; font-weight: 650; }
+  .connection-step h3 > span { display: flex; align-items: center; justify-content: center; border-radius: 50%; width: 25px; height: 25px; flex: none; color: #fff; background: linear-gradient(#93b9df, #568cc0); box-shadow: inset 0 1px 1px #ffffff80; font-size: 14px; }
+  .connection-step-body { padding-left: 35px; }
+  .connection-step p, .connection-disclosure-body p, .connection-help p { font-size: 12px; line-height: 1.8; color: #7588a0; margin: 0 0 12px; }
+  .connection-field { display: flex; flex-direction: column; gap: 7px; margin: 0 0 13px; font-size: 12px; font-weight: 550; color: #364a64; }
+  .connection-field input, .connection-field select { width: 100%; min-width: 0; padding: 9px 10px; border: 1px solid #cbd8e9; border-radius: 8px; background: #fefeff; color: #35465e; font-weight: 400; outline: none; font-size: 12px; min-height: 36px; }
+  .connection-field input::placeholder { color: #94a1b3; }
+  .connection-field input:focus, .connection-field select:focus { border-color: #79a0c4; box-shadow: 0 0 0 3px #6293c019; }
+  /* 无线端点字段采用图中的横向标签，缩短首次配对与连接的操作距离。 */
+  #connection-form-wireless .connection-field { display: grid; grid-template-columns: 100px minmax(0, 1fr); align-items: center; gap: 8px; }
+  .connection-submit { width: 100%; min-height: 36px; font-size: 12px; margin-bottom: 10px; }
+  .connection-submit:disabled { background: #e8edf3; border-color: #d0dbe9; color: #8492a4; opacity: .75; }
+  .connection-submit.primary:disabled { background: #a8c9ee; color: #fff; border-color: #a8c9ee; }
+  .connection-warning { display: flex; align-items: flex-start; gap: 6px; background: #fff3dc; border-radius: 7px; color: #a47429; font-size: 11px; line-height: 1.7; padding: 8px 9px; margin: 0 0 12px; }
+  .connection-step p.connection-warning { color: #a47429; }
+  .connection-step .connection-skip { color: #5b84b0; background: #eaf3ff; border-radius: 8px; padding: 4px 9px; font-size: 11px; display: inline-block; margin-bottom: 13px; }
+  .connection-disclosure { border: 1px solid #dae5f2; border-radius: 10px; margin: 0 0 14px; background: #ffffff70; }
+  .connection-disclosure > summary { cursor: pointer; padding: 12px 10px; font-size: 12px; font-weight: 600; color: #4b6481; }
+  .connection-disclosure > summary > span { font-size: 10px; color: #94a2b4; font-weight: 400; margin-left: 6px; }
+  .connection-disclosure-body { padding: 3px 12px 12px; }
+  .legacy-verification { margin-top: 12px; padding-top: 12px; border-top: 1px solid #e0e9f4; }
+  .connection-link { border: 0; padding: 3px 0 12px; background: transparent; color: #3976ac; font-size: 12px; text-decoration: underline; white-space: normal; text-align: left; }
+  .connection-help { border-top: 1px solid #e0e9f4; padding-top: 12px; }
+  .connection-help > summary { cursor: pointer; color: #4c7eab; font-size: 12px; }
+  .connection-help p { margin: 12px 0 0; }
+}
+@media (max-width: 1250px) {
+  @scope (.devices-page) {
+    .connection-head { padding: 16px 15px 12px; }
+    .connection-head h2 { font-size: 18px; }
+    .connection-head img { width: 100px; height: 80px; top: 0; right: 60px; }
+    .connection-scroll { padding: 0 13px 16px; }
+    .connection-step-body { padding-left: 30px; }
+  }
+}

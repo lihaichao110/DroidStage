@@ -4,6 +4,10 @@
 import type { CSSProperties } from 'react'
 
 const paths = {
+  plug: 'M8 2v5M16 2v5M5 7h14v4a7 7 0 01-14 0V7zM12 18v4',
+  search: 'M20 20l-5-5M17 10a7 7 0 11-14 0 7 7 0 0114 0z',
+  trash: 'M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7',
+  info: 'M21 12a9 9 0 11-18 0 9 9 0 0118 0zM12 11v6M12 7h.01',
   edit: 'M16 3l5 5M4 16L16 4a2 2 0 013 3L7 19l-4 1 1-4zM12 4H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7',
   phone: 'M7 2h10a1 1 0 011 1v18a1 1 0 01-1 1H7a1 1 0 01-1-1V3a1 1 0 011-1zM11 18h2',
   play: 'M6 3l15 9L6 21V3z',

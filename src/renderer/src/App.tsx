@@ -85,7 +85,7 @@ export default function App() {
       setMessage={setMessage} onShowDevices={() => switchPage('devices')}
       onRunPrepared={prepareRun}
     />
-    {page === 'devices' && <DeviceManagerPage fleet={fleet} batch={batch} onFocus={(serial) => { fleet.setFocused(serial); switchPage('editor') }} />}
+    {page === 'devices' && <DeviceManagerPage fleet={fleet} batch={batch} onFocus={fleet.setFocused} />}
     {page === 'monitor' && <RunMonitorPage batch={batch} devices={fleet.devices} connectedSerials={fleet.connectedSerials} pendingRun={pendingRun}
       onRunLaunched={launchRun} onRunLaunchFailed={failRun} onPendingCancel={cancelPendingRun}
       onCancel={(serial) => void cancel(serial)} onOpenResult={(directory) => void window.androidAutoDesk.openRunDir(directory).catch((error) => setMessage(errorText(error)))} onError={setMessage} />}

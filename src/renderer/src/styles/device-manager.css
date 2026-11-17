@@ -1,0 +1,93 @@
+/**
+ * 设备管理布局与表格：雾蓝面板、真实状态标签和独立滚动区。
+ */
+.devices-page.page-content {
+  display: flex; flex-direction: column; overflow: hidden; padding: 24px 18px 16px;
+  background: linear-gradient(135deg, #f2f6fc, #eaf2fb 65%, #f3f7fc);
+}
+@scope (.devices-page) {
+  [hidden] { display: none !important; }
+  * { scrollbar-width: thin; scrollbar-color: #c5d3e2 transparent; }
+  button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; white-space: nowrap; }
+  .primary { background: linear-gradient(#6593bd, #4075a6); border-color: #447ba9; color: #fff; box-shadow: inset 0 1px 1px #ffffff40; }
+  .primary:hover:not(:disabled) { background: linear-gradient(#709ec8, #4b80b2); }
+  .devices-heading { display: flex; align-items: center; gap: 20px; flex: none; margin: 0 0 22px; min-height: 60px; }
+  .devices-title { flex: none; }
+  .devices-title h2 { font-size: 25px; margin: 0 0 7px; color: #18283e; }
+  .devices-title p { margin: 0; color: #75869d; font-size: 12px; }
+  .devices-counts { display: flex; flex: 1; align-items: center; justify-content: center; gap: 16px; white-space: nowrap; }
+  .devices-counts > span { display: flex; align-items: center; gap: 7px; font-size: 13px; color: #34445c; }
+  .devices-counts > span + span { border-left: 1px solid #c3d4e8; padding-left: 16px; }
+  .devices-counts > span:nth-child(2) > svg { color: #388653; }
+  .devices-counts strong { color: #17273e; font-size: 19px; }
+  .devices-heading-actions { display: flex; gap: 12px; }
+  .devices-heading-actions button { min-height: 40px; font-size: 14px; padding: 8px 17px; }
+  .devices-layout { display: grid; grid-template-columns: minmax(0, 1fr) clamp(350px, 32%, 500px); gap: 14px; flex: 1; min-height: 0; }
+  .devices-layout.panel-collapsed { grid-template-columns: minmax(0, 1fr); }
+  .devices-card { border: 1px solid #cedff1; border-radius: 15px; background: linear-gradient(130deg, #fff, #fcfdff); box-shadow: 0 5px 22px #49678406; min-width: 0; min-height: 0; }
+  .devices-list { display: flex; flex-direction: column; overflow: hidden; }
+  .devices-toolbar { display: flex; align-items: center; gap: 9px; padding: 15px; flex: none; }
+  .device-search { display: flex; align-items: center; flex: 1; min-width: 120px; border: 1px solid #ccd9e9; border-radius: 9px; padding: 0 11px; color: #7d8b9d; background: #fcfdff; }
+  .device-search:focus-within { border-color: #79a0c4; box-shadow: 0 0 0 3px #6293c019; }
+  .device-search input { width: 100%; min-width: 0; padding: 10px 8px; border: 0; background: transparent; outline: none; font-size: 13px; color: #303b4b; }
+  .device-search input::placeholder { color: #8793a4; }
+  .devices-toolbar select { padding: 9px 8px; border-radius: 9px; border: 1px solid #ccd9e9; color: #34435a; background: #fff; min-height: 38px; font-size: 12px; }
+  .devices-target-actions { display: flex; gap: 8px; }
+  .devices-target-actions button { font-size: 12px; min-height: 37px; padding: 7px 9px; }
+  .devices-table-scroll { flex: 1; min-height: 0; overflow: auto; padding: 0 12px; overscroll-behavior: contain; }
+  .devices-table-scroll:focus-visible { outline: 2px solid #7ea6ca; outline-offset: -3px; }
+  .devices-table { width: 100%; min-width: 780px; border-collapse: separate; border-spacing: 0; font-size: 12px; text-align: left; }
+  .devices-table th { position: sticky; top: 0; z-index: 1; padding: 13px 9px; background: #f1f6fd; color: #697e98; font-weight: 600; white-space: nowrap; }
+  .devices-table th:first-child { border-top-left-radius: 8px; }
+  .devices-table th:last-child { border-top-right-radius: 8px; }
+  .devices-table td { padding: 14px 9px; border-bottom: 1px solid #e3ecf7; color: #283a53; vertical-align: middle; white-space: nowrap; }
+  .devices-table td:first-child, .devices-table th:first-child { text-align: center; width: 48px; }
+  .devices-table td:nth-child(2) { min-width: 190px; }
+  .devices-table tr.is-target td { background: #eaf3ff; border-bottom-color: #d5e5f7; }
+  .devices-table tbody tr:hover td { background: #f4f8fd; }
+  .devices-table tbody tr.is-target:hover td { background: #e3effe; }
+  .devices-table input[type=checkbox] { width: 17px; height: 17px; accent-color: #4b85ba; cursor: pointer; margin: 0; vertical-align: middle; }
+  .devices-table input[type=checkbox]:disabled { cursor: not-allowed; }
+  .device-identity { display: flex; align-items: center; gap: 11px; }
+  .device-identity > div { min-width: 0; }
+  .device-name { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+  .device-name strong { font-size: 13px; font-weight: 650; color: #192d47; }
+  .device-identity small { display: block; margin-top: 4px; font-size: 10px; color: #7b8aa0; overflow-wrap: anywhere; white-space: normal; max-width: 260px; }
+  .device-focus-tag { font-size: 10px; padding: 3px 7px; border-radius: 9px; background: #d8eaff; color: #316da5; font-weight: 600; }
+  .device-pill { display: inline-flex; align-items: center; justify-content: center; gap: 4px; border-radius: 999px; padding: 4px 8px; background: #eef2f8; color: #7b8da5; font-size: 11px; line-height: 1.4; }
+  .device-pill.ok { background: #e7f7ec; color: #26834a; }
+  .device-pill.warn { background: #fff2dd; color: #a86b18; }
+  .device-error, .device-identity small.device-error { color: #ae4942; font-size: 12px; line-height: 1.7; overflow-wrap: anywhere; white-space: normal; }
+  .device-row-actions { display: flex; align-items: center; gap: 6px; }
+  .device-row-actions > button { font-size: 11px; min-height: 30px; padding: 5px 8px; }
+  .device-row-actions .device-more { padding: 5px; }
+  .devices-list-foot { display: flex; align-items: center; gap: 8px; padding: 17px 22px; color: #7e8ea3; font-size: 12px; flex: none; border-top: 1px solid #e7edf5; }
+  .devices-empty { display: flex; align-items: center; justify-content: center; flex-direction: column; min-height: 260px; height: calc(100% - 44px); padding: 32px; text-align: center; color: #94a6bb; }
+  .devices-empty h3 { font-size: 17px; font-weight: 600; margin: 20px 0 8px; color: #526880; }
+  .devices-empty p { margin: 0 0 20px; font-size: 12px; line-height: 1.8; max-width: 330px; }
+  .devices-empty button { font-size: 12px; }
+}
+/* 菜单挂在页面外的浮层中，避免滚动容器裁剪。 */
+.device-action-menu { position: fixed; z-index: 15; width: 180px; padding: 5px; border: 1px solid #cedcea; border-radius: 10px; background: #fff; box-shadow: 0 8px 25px #29496922; }
+.device-action-menu button { display: flex; align-items: center; gap: 8px; width: 100%; border: 0; background: transparent; font-size: 12px; text-align: left; padding: 11px 9px; font-weight: 500; }
+.device-action-menu button:hover:not(:disabled), .device-action-menu button:focus-visible { background: #edf5ff; }
+@media (max-width: 1250px) {
+  .devices-page.page-content { padding: 18px 12px 12px; }
+  @scope (.devices-page) {
+    .devices-heading { flex-wrap: wrap; gap: 12px; margin-bottom: 14px; }
+    .devices-title { flex: 1; }
+    .devices-counts { order: 3; flex-basis: 100%; justify-content: flex-start; }
+    .devices-layout { grid-template-columns: minmax(0, 1fr) 340px; gap: 10px; }
+    .devices-toolbar { flex-wrap: wrap; padding: 12px; }
+    .devices-target-actions { flex-basis: 100%; justify-content: flex-end; }
+    .devices-table td { padding: 12px 8px; }
+  }
+}
+@media (max-height: 760px) {
+  @scope (.devices-page) {
+    .devices-heading { min-height: 48px; margin-bottom: 12px; }
+    .devices-title h2 { font-size: 22px; }
+    .devices-list-foot { padding: 12px 16px; }
+    .devices-table td { padding: 11px 8px; }
+  }
+}
